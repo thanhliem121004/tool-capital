@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+  window.storage = {
+    get: async function(key, isGlobal) {
+      try {
+        const res = await fetch('/api/sprint-state?key=' + encodeURIComponent(key));
+        const data = await res.json();
+        return { value: data.value };
+      } catch (e) {
+        return { value: localStorage.getItem(key) };
+      }
+    },
+    set: async function(key, value, isGlobal) {
+      try {
+        await fetch('/api/sprint-state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: key, value: value })
+        });
+      } catch (e) {
+        localStorage.setItem(key, value);
+      }
+    }
+  };
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>10-Day Launch Sprint — Restaurant Marketing App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FAF6EF; --card:#FFFFFF; --ink:#221C16; --muted:#8A8074; --line:#EAE2D3;
+    --rust:#C1502E; --rust-light:#FBE9E1;
+    --teal:#0F6E56; --teal-light:#DFF3EC;
+    --indigo:#3E4C7A; --indigo-light:#E7EAF4;
+    --gold:#A8791F; --gold-light:#F7EAD2;
+    --shadow: 0 1px 2px rgba(34,28,22,.04), 0 6px 16px rgba(34,28,22,.05);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+
+  header{
+    background:linear-gradient(135deg,#20362F 0%,#17251F 60%,#1C1613 100%);
+    color:#fff;padding:36px 24px 30px;position:relative;overflow:hidden;
+  }
+  header::after{
+    content:"";position:absolute;top:-40%;right:-10%;width:420px;height:420px;border-radius:50%;
+    background:radial-gradient(circle, rgba(193,80,46,.35), transparent 70%);pointer-events:none;
+  }
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#8FCDB6;margin-bottom:10px;position:relative;}
+  header h1{margin:0 0 8px;font-family:'Fraunces',serif;font-weight:600;font-size:clamp(26px,4vw,36px);position:relative;max-width:640px;}
+  header p{margin:0;color:#C9CBC3;font-size:14.5px;max-width:560px;position:relative;}
+
+  main{max-width:900px;margin:0 auto;padding:0 20px 80px;}
+
+  /* Setup banner */
+  .setup{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-top:-20px;margin-bottom:26px;box-shadow:var(--shadow);position:relative;z-index:2;}
+  .setup h3{margin:0 0 4px;font-size:15px;}
+  .setup p{margin:0 0 14px;color:var(--muted);font-size:13.5px;}
+  .setup-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .setup input[type=date]{border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;color:var(--ink);background:#fff;}
+  .setup input[type=text]{border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;color:var(--ink);background:#fff;width:180px;}
+  .btn{appearance:none;border:none;border-radius:8px;padding:10px 16px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .btn-primary{background:var(--rust);color:#fff;}
+  .btn-primary:hover{background:#a8451f;}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--muted);}
+  .btn-ghost:hover{background:#f5f0e6;}
+
+  /* Sticky stats bar */
+  .statbar{
+    position:sticky;top:0;z-index:20;background:rgba(250,246,239,.92);backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line);padding:14px 20px;margin:0 -20px 24px;
+  }
+  .statbar-inner{max-width:900px;margin:0 auto;}
+  .statbar-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;gap:12px;flex-wrap:wrap;}
+  .statbar-top .who{font-size:13px;color:var(--muted);}
+  .statbar-top .who button{background:none;border:none;color:var(--rust);font-weight:600;cursor:pointer;font-family:inherit;font-size:13px;padding:0;text-decoration:underline;}
+  .statbar-top .pct{font-family:'Fraunces',serif;font-weight:600;font-size:18px;}
+  .barbg{background:var(--line);border-radius:99px;height:8px;overflow:hidden;}
+  .barfill{background:linear-gradient(90deg,var(--teal),var(--rust));height:100%;border-radius:99px;transition:width .3s;}
+  .filters{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+  .filter-chip{
+    border:1px solid var(--line);background:#fff;border-radius:99px;padding:6px 13px;font-size:12.5px;font-weight:600;
+    cursor:pointer;color:var(--muted);display:flex;align-items:center;gap:6px;
+  }
+  .filter-chip .dot{width:8px;height:8px;border-radius:50%;}
+  .filter-chip.active{color:#fff;border-color:transparent;}
+  .filter-chip.active .dot{background:#fff !important;}
+
+  /* Day cards */
+  .day-card{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:14px;overflow:hidden;box-shadow:var(--shadow);}
+  .day-head{display:flex;align-items:center;gap:14px;padding:16px 18px;cursor:pointer;}
+  .day-head:hover{background:#faf7f1;}
+  .day-num{
+    font-family:'Fraunces',serif;font-weight:700;font-size:17px;color:var(--rust);
+    background:var(--rust-light);border-radius:10px;width:44px;height:44px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;border:1px dashed #e0b09e;
+  }
+  .day-head-text{flex:1;min-width:0;}
+  .day-title{font-weight:700;font-size:15px;margin:0 0 2px;}
+  .day-meta{font-size:12.5px;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .today-badge{background:var(--teal);color:#fff;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:99px;}
+  .day-progress-mini{width:80px;flex-shrink:0;}
+  .day-progress-mini .barbg{height:5px;}
+  .day-count{font-size:12px;color:var(--muted);white-space:nowrap;flex-shrink:0;font-family:'IBM Plex Mono',monospace;}
+  .chev{color:var(--muted);font-size:13px;transition:transform .15s;flex-shrink:0;}
+  .day-card.open .chev{transform:rotate(180deg);}
+  .day-body{display:none;padding:2px 18px 16px;}
+  .day-card.open .day-body{display:block;}
+
+  .task{display:flex;align-items:flex-start;gap:11px;padding:10px 4px;border-top:1px solid #f2ede2;flex-wrap:wrap;}
+  .task:first-child{border-top:none;}
+  .task input[type=checkbox]{
+    margin-top:3px;width:17px;height:17px;flex-shrink:0;accent-color:var(--rust);cursor:pointer;
+  }
+  .task-text{flex:1 1 160px;font-size:14px;min-width:0;}
+  .task.checked .task-text{color:var(--muted);text-decoration:line-through;}
+  .task-sub{font-size:11.5px;color:var(--muted);margin-top:2px;font-family:'IBM Plex Mono',monospace;}
+  .owner-tag{
+    font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+    padding:3px 9px;border-radius:99px;white-space:nowrap;flex-shrink:0;margin-top:1px;
+  }
+  .owner-steven{background:var(--teal-light);color:var(--teal);}
+  .owner-partner{background:var(--rust-light);color:var(--rust);}
+  .owner-dev{background:var(--indigo-light);color:var(--indigo);}
+  .owner-team{background:var(--gold-light);color:var(--gold);}
+
+  .task.hidden{display:none;}
+
+  .legend-dot-steven{background:var(--teal);}
+  .legend-dot-partner{background:var(--rust);}
+  .legend-dot-dev{background:var(--indigo);}
+  .legend-dot-team{background:var(--gold);}
+  .chip-steven.active{background:var(--teal);}
+  .chip-partner.active{background:var(--rust);}
+  .chip-dev.active{background:var(--indigo);}
+  .chip-team.active{background:var(--gold);}
+  .chip-all.active{background:var(--ink);}
+
+  footer{max-width:900px;margin:0 auto;padding:10px 20px 40px;color:var(--muted);font-size:12.5px;text-align:center;}
+  .loading{padding:40px 20px;text-align:center;color:var(--muted);font-size:14px;}
+
+  /* Editable tasks */
+  .task-side{display:flex;align-items:center;gap:6px;flex-shrink:0;margin-left:auto;}
+  .edit-btn{
+    appearance:none;border:1px solid var(--line);background:#fff;border-radius:7px;width:26px;height:26px;
+    color:var(--muted);font-size:12px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  }
+  .edit-btn:hover{background:#f5f0e6;color:var(--ink);}
+  .task-editing{background:#faf7f1;border-radius:10px;margin:4px 0;padding:10px !important;}
+  .edit-form{width:100%;}
+  .edit-text{
+    width:100%;min-height:60px;border:1px solid var(--line);border-radius:8px;padding:9px 10px;
+    font-family:inherit;font-size:14px;color:var(--ink);resize:vertical;background:#fff;
+  }
+  .edit-row{display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;}
+  .edit-row select{
+    border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:#fff;color:var(--ink);
+  }
+  .btn-danger{background:transparent;border:1px solid #e0b0a3;color:var(--rust);margin-left:auto;}
+  .btn-danger:hover{background:var(--rust-light);}
+
+  .add-task-row{padding:8px 4px 2px;}
+  .add-task-btn{
+    appearance:none;border:1px dashed var(--line);background:transparent;border-radius:9px;
+    padding:9px 12px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;width:100%;text-align:left;font-family:inherit;
+  }
+  .add-task-btn:hover{border-color:var(--rust);color:var(--rust);background:var(--rust-light);}
+  .add-form{background:#faf7f1;border:1px solid var(--line);border-radius:10px;padding:12px;}
+  .add-text{
+    width:100%;min-height:50px;border:1px solid var(--line);border-radius:8px;padding:9px 10px;
+    font-family:inherit;font-size:14px;color:var(--ink);resize:vertical;background:#fff;
+  }
+
+  .restore-link{background:none;border:none;color:var(--muted);text-decoration:underline;cursor:pointer;font-family:inherit;font-size:12.5px;padding:0;}
+
+  /* Responsive */
+  @media (max-width:600px){
+    header{padding:26px 16px 22px;}
+    main{padding:0 12px 60px;}
+    .statbar{margin:0 -12px 20px;padding:12px 14px;}
+    .day-head{padding:13px 12px;gap:10px;}
+    .day-num{width:38px;height:38px;font-size:14px;}
+    .day-title{font-size:13.5px;}
+    .day-meta{font-size:11.5px;}
+    .day-progress-mini{display:none;}
+    .task{padding:9px 2px;gap:9px;}
+    .task-text{font-size:13.5px;flex:1 1 140px;}
+    .owner-tag{font-size:9.5px;padding:2px 7px;}
+    .edit-row{flex-direction:column;align-items:stretch;}
+    .edit-row select, .edit-row .btn{width:100%;}
+    .btn-danger{margin-left:0;}
+    .setup-row{flex-direction:column;align-items:stretch;}
+    .setup-row input, .setup-row button{width:100%;}
+    .filters{gap:6px;}
+    .filter-chip{padding:6px 10px;font-size:12px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Build plan → execution</div>
+  <h1>10-day launch sprint</h1>
+  <p>Compressed from the 30-day roadmap. Website, content engine, and SEO app running in parallel, split across three people. Check things off as you go — everyone on this link sees the same progress.</p>
+</header>
+
+<main>
+  <div id="setup" class="setup" style="display:none;">
+    <h3>Set your sprint start date</h3>
+    <p>This maps each day to a real calendar date and highlights where you are today. Anyone on the team can set it once.</p>
+    <div class="setup-row">
+      <input type="date" id="start-date-input">
+      <button class="btn btn-primary" id="start-date-btn">Start the sprint</button>
+    </div>
+  </div>
+
+  <div class="statbar">
+    <div class="statbar-inner">
+      <div class="statbar-top">
+        <div>
+          <div class="pct" id="overall-pct">— </div>
+        </div>
+        <div class="who" id="who-row">Loading…</div>
+      </div>
+      <div class="barbg"><div class="barfill" id="overall-bar" style="width:0%"></div></div>
+      <div class="filters" id="filters">
+        <button class="filter-chip chip-all active" data-owner="all">Everyone</button>
+        <button class="filter-chip chip-steven" data-owner="steven"><span class="dot legend-dot-steven"></span>Steven</button>
+        <button class="filter-chip chip-partner" data-owner="partner"><span class="dot legend-dot-partner"></span>Partner</button>
+        <button class="filter-chip chip-dev" data-owner="dev"><span class="dot legend-dot-dev"></span>Dev</button>
+        <button class="filter-chip chip-team" data-owner="team"><span class="dot legend-dot-team"></span>Together</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="days-container">
+    <div class="loading">Loading sprint progress…</div>
+  </div>
+
+  <footer id="footer-note"></footer>
+</main>
+
+<script>
+const DAYS = [
+  {n:1, title:"Lock decisions + write the offer copy"},
+  {n:2, title:"Build the website system"},
+  {n:3, title:"Build the audit + booking flow"},
+  {n:4, title:"Go live — outreach starts here"},
+  {n:5, title:"Sign pilots + shoot content"},
+  {n:6, title:"Audit engine + database"},
+  {n:7, title:"Rank tracking + dashboard live"},
+  {n:8, title:"Reputation + chatbot"},
+  {n:9, title:"Full QA + delivery optimization"},
+  {n:10, title:"Launch prep"},
+];
+
+const DEFAULT_TASKS = [
+  {key:'seo-app-scope', day:1, owner:'team', text:'Lock SEO app v1 scope — pick 4-5 automated actions (GBP audit, rank tracking, AI recommendations, review response drafting, citation sync)'},
+  {key:'dashboard-content', day:1, owner:'team', text:'Decide what the client sees on login — rank chart, GBP score before/after, content calendar, audit status (3-4 numbers max, no SEO jargon)'},
+  {key:'content-ratio', day:1, owner:'team', text:'Confirm content ratio — 15 reels + 4 statics for Starter, scaling up by tier'},
+  {key:'pricing-tiers', day:1, owner:'team', text:'Review and finalize Starter / Growth / Premium pricing and value breakdowns'},
+  {key:'offer-copy', day:1, owner:'steven', text:'Write the offer copy for the website itself — the free-audit + free-website + content-volume pitch. This is the homepage/landing copy, not a separate document to send'},
+  {key:'outreach-list', day:1, owner:'partner', text:'Build the outreach list — 15-20 local target restaurants (prep only — you message them once the site is live on Day 4, not before)'},
+  {key:'tech-stack-split', day:1, owner:'dev', text:"Pick the tech stack and write down the dev-vs-AI-builder split (auth, DB, integrations = dev; dashboard UI, prompt flows = AI builder)"},
+
+  {key:'website-templates', day:2, owner:'dev', text:'Build 5-10 website templates matched to cuisine/style'},
+  {key:'website-intake-form', day:2, owner:'dev', text:'Build the intake form that feeds the AI website builder directly — no manual copy-paste'},
+  {key:'ai-population-wiring', day:2, owner:'dev', text:'Wire AI population from the intake form into the templates'},
+  {key:'per-client-intake-fields', day:2, owner:'team', text:'Finalize per-client intake fields — business info, GBP OAuth, site URL, target keywords, hours/menu/photos, socials, review platforms'},
+  {key:'tooling-decisions', day:2, owner:'team', text:"Confirm tooling: social posting method (Meta Graph API + manual TikTok) and check each platform's review-automation policy"},
+  {key:'shot-list-template', day:2, owner:'partner', text:'Build the shot list template + posting cadence (prep — no client booking yet)'},
+  {key:'rank-vendor-eval', day:2, owner:'dev', text:'Evaluate a rank-tracking vendor (SerpApi vs DataForSEO) and start the GBP API access process'},
+
+  {key:'audit-landing-page', day:3, owner:'dev', text:'Build the audit opt-in landing page — this is what the "free audit" offer links to'},
+  {key:'gbp-audit-logic', day:3, owner:'dev', text:'Build the GBP audit checklist logic — NAP consistency, categories filled, photo count, posting activity, review count/rating, response rate'},
+  {key:'website-qa-checklist', day:3, owner:'dev', text:'Build the fixed 15-minute website QA checklist — mobile, broken links, typos, load speed'},
+  {key:'one-click-hosting', day:3, owner:'dev', text:'Pre-configure hosting so deploy is one click'},
+  {key:'book-a-call-step', day:3, owner:'dev', text:'Set up the "book a call" step after the audit result (Calendly or similar)'},
+  {key:'full-flow-walkthrough', day:3, owner:'team', text:'Walk the whole flow yourselves end to end — visit the site, opt into the audit, book a call — and fix anything broken before anyone else sees it'},
+
+  {key:'site-goes-live', day:4, owner:'team', text:'Flip the site live'},
+  {key:'send-outreach', day:4, owner:'steven', text:'Send the outreach message to the pilot list, linking straight to the site — the site does the pitching, not a separate doc'},
+  {key:'close-pilots', day:4, owner:'steven', text:'Take the first booked calls; close pilots at the founding/discounted rate for case-study rights'},
+  {key:'brand-kit-sheet', day:4, owner:'partner', text:"Finalize the brand-kit intake sheet (logo, colors, fonts) so it's ready the moment someone signs"},
+  {key:'live-bug-watch', day:4, owner:'dev', text:'Watch for bugs as real traffic hits the live audit flow; fix anything that breaks'},
+
+  {key:'keep-closing-pilots', day:5, owner:'steven', text:'Keep closing pilot signups from calls booked through the site — aim for 3-5 total'},
+  {key:'collect-oauth', day:5, owner:'steven', text:'Collect OAuth access (not shared passwords) from signed pilots'},
+  {key:'batch-shoot', day:5, owner:'partner', text:'Schedule and run the batch shoot for signed pilots — one city, one day'},
+  {key:'client-account-flow', day:5, owner:'dev', text:'Build the client account flow (business info + account access) that auto-triggers the AI audit once someone signs'},
+  {key:'database-schema', day:5, owner:'dev', text:'Build the database schema — clients, audit history, rank history, content log'},
+
+  {key:'audit-scoring-engine', day:6, owner:'dev', text:'Finish the audit scoring logic and AI recommendation generator'},
+  {key:'gbp-api-connect', day:6, owner:'dev', text:'Connect the GBP API for live data pull'},
+  {key:'rank-api-integrate', day:6, owner:'dev', text:'Integrate the rank-tracking API'},
+  {key:'footage-to-editors', day:6, owner:'partner', text:'Hand shoot footage to editors and kick off the editing pipeline with presets/templates'},
+  {key:'onboard-pilots-account', day:6, owner:'steven', text:'Onboard signed pilots into the account flow'},
+
+  {key:'dashboard-ui', day:7, owner:'dev', text:'Build the client dashboard UI — rank chart, GBP before/after, content calendar, audit status'},
+  {key:'qa-dashboards', day:7, owner:'team', text:'QA every pilot dashboard end to end — numbers accurate, no jargon'},
+  {key:'content-qa-scheduler', day:7, owner:'partner', text:'QA the first edited batch against the brand/caption checklist; set up the multi-platform scheduler (IG, TikTok, Facebook, YouTube at once)'},
+  {key:'collect-proof-start', day:7, owner:'steven', text:'Start collecting before/after proof — rank movement, screenshots'},
+
+  {key:'reputation-v1', day:8, owner:'dev', text:'Build reputation system v1 — QR/table-tent trigger, SMS/email flow, sentiment-based response templates, human escalation under 2 stars'},
+  {key:'ai-chatbot', day:8, owner:'dev', text:"Build the AI chatbot trained on menu/hours/FAQ; test against 10 real questions; set the handoff rule for what it can't answer"},
+  {key:'ai-review-responses', day:8, owner:'dev', text:"Wire up AI-drafted review responses — confirm each platform's automation policy first"},
+  {key:'post-first-batch', day:8, owner:'partner', text:'Post the first batch of reels and statics live; start tracking early performance'},
+
+  {key:'full-pipeline-run', day:9, owner:'team', text:'Run every pilot through the full pipeline — intake, build, QA, deploy, monitor — and fix any gaps'},
+  {key:'delivery-app-optimization', day:9, owner:'dev', text:'Reuse the GBP checklist for delivery-app optimization — DoorDash and Uber Eats photos, description, category'},
+  {key:'content-sop', day:9, owner:'partner', text:'Write the content SOP — shoot scheduling, editing handoff, posting'},
+  {key:'finalize-proof-package', day:9, owner:'steven', text:'Finalize the proof package — screenshots, rank movement, view counts, GBP score change'},
+
+  {key:'lock-final-pricing', day:10, owner:'team', text:'Lock final pricing using real pilot proof; confirm the guarantee language'},
+  {key:'hosting-lockin-policy', day:10, owner:'team', text:'Decide the website hosting lock-in policy — host it yourselves, so canceling takes the site down'},
+  {key:'outreach-beyond-pilots', day:10, owner:'steven', text:'Prep outreach beyond the pilot group at full price ($1,000-3,000)'},
+  {key:'onboarding-sops', day:10, owner:'partner', text:'Finalize onboarding and posting SOPs into one shared doc'},
+  {key:'monthly-report-automation', day:10, owner:'dev', text:'Set up the automated monthly report pulled from dashboard data'},
+  {key:'regression-pass', day:10, owner:'dev', text:'Final regression pass on the whole app; confirm one-click deploy works for the next client'},
+  {key:'team-retro', day:10, owner:'team', text:"Team retro — what's still manual, plan days 11-20 (hire videographers, expand editing capacity, referral program)"},
+];
+
+const OWNER_LABEL = {steven:'Steven', partner:'Partner', dev:'Dev', team:'Together'};
+const STATE_KEY = 'sprint-state';
+const NAME_KEY = 'my-name';
+
+// Earlier versions of this tracker keyed progress off day-position ids (d1-1, d2-3, etc).
+// When the plan got reordered, those ids started pointing at different tasks. This map
+// carries forward anything already checked to the correct task under its new permanent key.
+const LEGACY_ID_MAP = {
+  'd1-1':'seo-app-scope','d1-2':'dashboard-content','d1-3':'content-ratio','d1-4':'pricing-tiers',
+  'd1-5':'offer-copy','d1-6':'outreach-list','d1-7':'tech-stack-split','d1-8':'rank-vendor-eval',
+  'd2-1':'per-client-intake-fields','d2-2':'tooling-decisions','d2-3':'send-outreach',
+  'd2-4':'shot-list-template','d2-5':'website-templates','d2-6':'website-intake-form',
+  'd3-1':'ai-population-wiring','d3-2':'website-qa-checklist','d3-3':'one-click-hosting',
+  'd3-4':'send-outreach','d3-5':'brand-kit-sheet','d3-6':'full-flow-walkthrough',
+  'd4-1':'batch-shoot','d4-2':'close-pilots','d4-3':'client-account-flow','d4-4':'gbp-audit-logic',
+  'd5-1':'audit-scoring-engine','d5-2':'gbp-api-connect','d5-3':'database-schema',
+  'd5-4':'footage-to-editors','d5-5':'collect-oauth',
+  'd6-1':'rank-api-integrate','d6-2':'dashboard-ui','d6-3':'content-qa-scheduler','d6-4':'content-qa-scheduler',
+  'd6-5':'onboard-pilots-account','d7-1':'qa-dashboards','d7-2':'reputation-v1','d7-3':'post-first-batch',
+  'd7-4':'collect-proof-start','d8-1':'ai-chatbot','d8-2':'ai-review-responses',
+  'd9-1':'full-pipeline-run','d9-2':'delivery-app-optimization','d9-3':'content-sop','d9-4':'finalize-proof-package',
+  'd10-1':'lock-final-pricing','d10-2':'hosting-lockin-policy','d10-3':'outreach-beyond-pilots',
+  'd10-4':'onboarding-sops','d10-5':'monthly-report-automation','d10-6':'regression-pass','d10-7':'team-retro'
+};
+
+function migrateLegacyProgress(){
+  let changed = false;
+  for(const oldId in LEGACY_ID_MAP){
+    const rec = state.progress[oldId];
+    if(rec && rec.checked){
+      const newKey = LEGACY_ID_MAP[oldId];
+      const existing = state.progress[newKey];
+      if(!existing || !existing.checked){
+        state.progress[newKey] = rec;
+        changed = true;
+      }
+    }
+    if(state.progress[oldId] !== undefined){
+      delete state.progress[oldId];
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+let state = { startDate: null, progress: {}, tasks: null };
+let myName = '';
+let activeFilter = 'all';
+let openDay = 1;
+let editingKey = null;
+let addingDay = null;
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function generateKey(){
+  return 'custom-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,7);
+}
+
+async function addTask(day, owner, text){
+  if(!text || !text.trim()) return;
+  state.tasks.push({ key: generateKey(), day, owner, text: text.trim() });
+  await saveState();
+}
+
+async function updateTask(key, {text, owner, day}){
+  const t = state.tasks.find(t=>t.key===key);
+  if(!t) return;
+  if(text !== undefined && text.trim()) t.text = text.trim();
+  if(owner !== undefined) t.owner = owner;
+  if(day !== undefined) t.day = day;
+  await saveState();
+}
+
+async function deleteTask(key){
+  state.tasks = state.tasks.filter(t=>t.key!==key);
+  delete state.progress[key];
+  await saveState();
+}
+
+async function restoreDefaults(){
+  state.tasks = DEFAULT_TASKS.map(t=>Object.assign({}, t));
+  await saveState();
+}
+
+function fmtDate(d){
+  return d.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+}
+function dateForDay(n){
+  if(!state.startDate) return null;
+  const start = new Date(state.startDate + 'T00:00:00');
+  const d = new Date(start);
+  d.setDate(d.getDate() + (n-1));
+  return d;
+}
+function isToday(d){
+  if(!d) return false;
+  const t = new Date();
+  return d.getFullYear()===t.getFullYear() && d.getMonth()===t.getMonth() && d.getDate()===t.getDate();
+}
+
+async function loadState(){
+  try{
+    const res = await window.storage.get(STATE_KEY, true);
+    if(res && res.value){
+      const parsed = JSON.parse(res.value);
+      state = Object.assign({startDate:null, progress:{}, tasks:null}, parsed);
+    }
+  }catch(e){ /* key doesn't exist yet, use defaults */ }
+  try{
+    const res = await window.storage.get(NAME_KEY, false);
+    if(res && res.value) myName = res.value;
+  }catch(e){ /* not set yet */ }
+}
+
+async function saveState(){
+  try{
+    await window.storage.set(STATE_KEY, JSON.stringify(state), true);
+  }catch(e){ console.error('Failed to save sprint state', e); }
+}
+
+async function saveName(name){
+  myName = name;
+  try{ await window.storage.set(NAME_KEY, name, false); }catch(e){ console.error('Failed to save name', e); }
+}
+
+function ensureName(){
+  if(myName) return Promise.resolve(myName);
+  const name = window.prompt("What's your name? (so teammates know who checked what)");
+  if(name && name.trim()){
+    return saveName(name.trim()).then(()=>myName);
+  }
+  return Promise.resolve('');
+}
+
+function computeCounts(owner){
+  const list = owner ? state.tasks.filter(t=>t.owner===owner) : state.tasks;
+  const done = list.filter(t=>state.progress[t.key] && state.progress[t.key].checked).length;
+  return {done, total:list.length};
+}
+
+function renderStatbar(){
+  const {done, total} = computeCounts(null);
+  const pct = total ? Math.round((done/total)*100) : 0;
+  document.getElementById('overall-pct').textContent = pct + '% complete';
+  document.getElementById('overall-bar').style.width = pct + '%';
+
+  const whoRow = document.getElementById('who-row');
+  whoRow.innerHTML = myName
+    ? `${done} of ${total} tasks done · signed in as <b>${myName}</b> · <button id="change-name-btn">switch</button>`
+    : `${done} of ${total} tasks done · <button id="change-name-btn">set your name</button>`;
+  const btn = document.getElementById('change-name-btn');
+  if(btn){
+    btn.addEventListener('click', async ()=>{
+      const name = window.prompt("What's your name?", myName || '');
+      if(name && name.trim()){ await saveName(name.trim()); renderStatbar(); }
+    });
+  }
+}
+
+function renderSetup(){
+  const el = document.getElementById('setup');
+  if(state.startDate){ el.style.display = 'none'; return; }
+  el.style.display = 'block';
+}
+
+function taskRowHTML(task){
+  const rec = state.progress[task.key];
+  const checked = rec && rec.checked;
+  const hiddenClass = (activeFilter!=='all' && task.owner!==activeFilter) ? ' hidden' : '';
+
+  if(editingKey === task.key){
+    return `
+    <div class="task task-editing${hiddenClass}" data-owner="${task.owner}">
+      <div class="edit-form">
+        <textarea class="edit-text">${escapeHtml(task.text)}</textarea>
+        <div class="edit-row">
+          <select class="edit-owner">
+            ${['steven','partner','dev','team'].map(o=>`<option value="${o}" ${o===task.owner?'selected':''}>${OWNER_LABEL[o]}</option>`).join('')}
+          </select>
+          <select class="edit-day">
+            ${DAYS.map(d=>`<option value="${d.n}" ${d.n===task.day?'selected':''}>Day ${d.n}</option>`).join('')}
+          </select>
+          <button class="btn btn-primary btn-save-task" data-key="${task.key}">Save</button>
+          <button class="btn btn-ghost btn-cancel-edit">Cancel</button>
+          <button class="btn btn-danger btn-delete-task" data-key="${task.key}">Delete</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const sub = checked && rec.by ? `<div class="task-sub">✓ ${escapeHtml(rec.by)}</div>` : '';
+  return `
+    <div class="task${checked?' checked':''}${hiddenClass}" data-owner="${task.owner}">
+      <input type="checkbox" data-key="${task.key}" ${checked?'checked':''}>
+      <div class="task-text">${escapeHtml(task.text)}${sub}</div>
+      <div class="task-side">
+        <span class="owner-tag owner-${task.owner}">${OWNER_LABEL[task.owner]}</span>
+        <button class="edit-btn" data-edit-key="${task.key}" aria-label="Edit task">✎</button>
+      </div>
+    </div>`;
+}
+
+function addFormHTML(dayNum){
+  if(addingDay !== dayNum){
+    return `<div class="add-task-row"><button class="add-task-btn" data-add-day="${dayNum}">+ Add a task</button></div>`;
+  }
+  return `
+    <div class="add-task-row">
+      <div class="add-form">
+        <textarea class="add-text" placeholder="What needs to happen?"></textarea>
+        <div class="edit-row">
+          <select class="add-owner">
+            <option value="steven">Steven</option>
+            <option value="partner">Partner</option>
+            <option value="dev">Dev</option>
+            <option value="team" selected>Together</option>
+          </select>
+          <button class="btn btn-primary btn-confirm-add" data-day="${dayNum}">Add task</button>
+          <button class="btn btn-ghost btn-cancel-add">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderDays(){
+  const container = document.getElementById('days-container');
+  container.innerHTML = DAYS.map(day=>{
+    const dayTasks = state.tasks.filter(t=>t.day===day.n);
+    const dc = dayTasks.filter(t=>state.progress[t.key] && state.progress[t.key].checked).length;
+    const dt = dayTasks.length;
+    const dpct = dt ? Math.round((dc/dt)*100) : 0;
+    const d = dateForDay(day.n);
+    const today = isToday(d);
+    const isOpen = day.n === openDay;
+    return `
+    <div class="day-card${isOpen?' open':''}" data-day="${day.n}">
+      <div class="day-head" data-toggle="${day.n}">
+        <div class="day-num">D${day.n}</div>
+        <div class="day-head-text">
+          <p class="day-title">${day.title}</p>
+          <div class="day-meta">
+            ${d ? `<span>${fmtDate(d)}</span>` : ''}
+            ${today ? `<span class="today-badge">Today</span>` : ''}
+          </div>
+        </div>
+        <div class="day-progress-mini"><div class="barbg"><div class="barfill" style="width:${dpct}%"></div></div></div>
+        <div class="day-count mono">${dc}/${dt}</div>
+        <div class="chev">▾</div>
+      </div>
+      <div class="day-body">
+        ${dayTasks.map(taskRowHTML).join('')}
+        ${addFormHTML(day.n)}
+      </div>
+    </div>`;
+  }).join('');
+
+  container.querySelectorAll('[data-toggle]').forEach(head=>{
+    head.addEventListener('click', ()=>{
+      const card = head.closest('.day-card');
+      const wasOpen = card.classList.contains('open');
+      container.querySelectorAll('.day-card').forEach(c=>c.classList.remove('open'));
+      if(!wasOpen){ card.classList.add('open'); openDay = parseInt(card.dataset.day,10); }
+      else { openDay = null; }
+    });
+  });
+
+  container.querySelectorAll('input[type=checkbox][data-key]').forEach(box=>{
+    box.addEventListener('change', async ()=>{
+      const key = box.dataset.key;
+      if(box.checked){
+        const name = await ensureName();
+        state.progress[key] = { checked:true, by: name || 'Teammate', at: new Date().toISOString() };
+      } else {
+        state.progress[key] = { checked:false };
+      }
+      await saveState();
+      renderAll();
+    });
+  });
+
+  container.querySelectorAll('.edit-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      editingKey = btn.dataset.editKey;
+      renderAll();
+    });
+  });
+
+  container.querySelectorAll('.btn-cancel-edit').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ editingKey = null; renderAll(); });
+  });
+
+  container.querySelectorAll('.btn-save-task').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const key = btn.dataset.key;
+      const form = btn.closest('.edit-form');
+      const text = form.querySelector('.edit-text').value;
+      const owner = form.querySelector('.edit-owner').value;
+      const day = parseInt(form.querySelector('.edit-day').value, 10);
+      await updateTask(key, {text, owner, day});
+      editingKey = null;
+      renderAll();
+    });
+  });
+
+  container.querySelectorAll('.btn-delete-task').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!window.confirm('Delete this task for everyone on this link?')) return;
+      await deleteTask(btn.dataset.key);
+      editingKey = null;
+      renderAll();
+    });
+  });
+
+  container.querySelectorAll('.add-task-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      addingDay = parseInt(btn.dataset.addDay,10);
+      renderAll();
+    });
+  });
+
+  container.querySelectorAll('.btn-cancel-add').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ addingDay = null; renderAll(); });
+  });
+
+  container.querySelectorAll('.btn-confirm-add').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const day = parseInt(btn.dataset.day,10);
+      const form = btn.closest('.add-form');
+      const text = form.querySelector('.add-text').value;
+      const owner = form.querySelector('.add-owner').value;
+      if(!text.trim()) return;
+      await addTask(day, owner, text);
+      addingDay = null;
+      renderAll();
+    });
+  });
+}
+
+function renderFilters(){
+  document.querySelectorAll('.filter-chip').forEach(chip=>{
+    chip.classList.toggle('active', chip.dataset.owner === activeFilter);
+  });
+}
+
+function renderAll(){
+  renderStatbar();
+  renderSetup();
+  renderDays();
+  renderFilters();
+}
+
+document.getElementById('filters').addEventListener('click', (e)=>{
+  const chip = e.target.closest('.filter-chip');
+  if(!chip) return;
+  activeFilter = chip.dataset.owner;
+  renderAll();
+});
+
+document.getElementById('start-date-btn').addEventListener('click', async ()=>{
+  const val = document.getElementById('start-date-input').value;
+  if(!val) return;
+  state.startDate = val;
+  await saveState();
+  renderAll();
+});
+
+(async function init(){
+  await loadState();
+  const migrated = migrateLegacyProgress();
+  if(!state.tasks || !state.tasks.length){
+    state.tasks = DEFAULT_TASKS.map(t=>Object.assign({}, t));
+    await saveState();
+  } else if(migrated){
+    await saveState();
+  }
+  if(!state.startDate){
+    const today = new Date();
+    document.getElementById('start-date-input').value = today.toISOString().slice(0,10);
+  }
+  // default open day = today's sprint day if a start date is set, else day 1
+  if(state.startDate){
+    const start = new Date(state.startDate + 'T00:00:00');
+    const t = new Date();
+    t.setHours(0,0,0,0);
+    start.setHours(0,0,0,0);
+    const diff = Math.round((t-start)/(1000*60*60*24)) + 1;
+    openDay = (diff>=1 && diff<=10) ? diff : 1;
+  }
+  renderAll();
+  const footer = document.getElementById('footer-note');
+  footer.innerHTML = 'Progress and edits save automatically and are shared with everyone who opens this link. &nbsp;·&nbsp; <button class="restore-link" id="restore-defaults-btn">Restore original task list</button>';
+  document.getElementById('restore-defaults-btn').addEventListener('click', async ()=>{
+    if(!window.confirm('Reset the task list back to the original plan? Any tasks your team added or edited will be lost.')) return;
+    await restoreDefaults();
+    editingKey = null;
+    addingDay = null;
+    renderAll();
+  });
+})();
+</script>
+
+</body>
+</html>

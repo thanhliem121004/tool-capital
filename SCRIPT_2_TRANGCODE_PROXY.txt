@@ -1,0 +1,107 @@
+// ==UserScript==
+// @name         Auto OTP Fetcher & Relayer for SellAllMail (Latest Sync 5.3)
+// @namespace    http://tampermonkey.net/
+// @version      5.3
+// @description  Tự động quét mã OTP mới nhất xuyên qua các iframe của Trangcode và POST về local bridge (Đã lọc mã màu 707070)
+// @author       Antigravity AI
+// @match        https://sellallmail.com/mailbox*
+// @grant        GM_xmlhttpRequest
+// @connect      127.0.0.1
+// @connect      localhost
+// @run-at       document-end
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // Tạo hộp debug hiển thị trạng thái trên trang Trangcode ẩn danh
+    const debugDiv = document.createElement('div');
+    debugDiv.style.position = 'fixed';
+    debugDiv.style.bottom = '10px';
+    debugDiv.style.right = '10px';
+    debugDiv.style.background = '#0284c7';
+    debugDiv.style.color = 'white';
+    debugDiv.style.padding = '10px 14px';
+    debugDiv.style.borderRadius = '8px';
+    debugDiv.style.zIndex = '999999';
+    debugDiv.style.fontSize = '12px';
+    debugDiv.style.fontFamily = 'monospace';
+    debugDiv.innerHTML = '⚙️ [Bridge] Đang dò email...';
+    document.body.appendChild(debugDiv);
+
+    function getMailboxEmail() {
+        // Cách 1: Quét input chứa email khôi phục đang mở
+        const input = document.querySelector('input[value*="@"]');
+        if (input && input.value) return input.value.trim().toLowerCase();
+
+        // Cách 2: Tìm text có chứa email khôi phục
+        const matches = document.body.innerText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
+        if (matches) return matches[0].trim().toLowerCase();
+        return null;
+    }
+
+    function scrapeOtp() {
+        let plainText = document.body.innerText || '';
+
+        // QUÉT XUYÊN IFRAME CÙNG NGUỒN GỐC
+        const iframes = document.querySelectorAll('iframe');
+        iframes.forEach(iframe => {
+            try {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                if (iframeDoc && iframeDoc.body) {
+                    plainText += ' ' + iframeDoc.body.innerText;
+                }
+            } catch (e) {
+                // Bỏ qua lỗi CORS nếu iframe khác nguồn gốc (thông thường Trangcode dùng iframe cùng domain)
+            }
+        });
+
+        // Quét tìm tất cả các số có đúng 6 chữ số hiển thị trên văn bản thuần gộp được
+        const matches = plainText.match(/\b\d{6}\b/g);
+        if (!matches) return null;
+
+        // Loại bỏ số 707070 (mã màu CSS) để tránh nhận nhầm mã OTP
+        const cleanMatches = matches.filter(m => m !== '707070');
+        if (cleanMatches.length === 0) return null;
+
+        // Trả về số cuối cùng xuất hiện trên trang (tương ứng với thư mới nhất ở cột phải)
+        return cleanMatches[cleanMatches.length - 1];
+    }
+
+    // Vòng lặp check và gửi OTP
+    setInterval(() => {
+        const email = getMailboxEmail();
+        if (!email) {
+            debugDiv.style.background = '#ef4444';
+            debugDiv.innerHTML = '⚙️ [Bridge] Không tìm thấy email trên giao diện!';
+            return;
+        }
+
+        const otp = scrapeOtp();
+        if (!otp) {
+            debugDiv.style.background = '#eab308';
+            debugDiv.innerHTML = `⚙️ [Bridge] Mail: ${email}<br>⏳ Chưa phát hiện số OTP 6 chữ số nào...`;
+            return;
+        }
+
+        debugDiv.style.background = '#22c55e';
+        debugDiv.innerHTML = `⚙️ [Bridge] Mail: ${email}<br>🔐 Phát hiện OTP: ${otp}<br>🚀 Đang đồng bộ...`;
+
+        // Gửi OTP về local API Bridge của Tool
+        GM_xmlhttpRequest({
+            method: 'POST',
+            url: 'http://127.0.0.1:3000/api/otp-bridge',
+            headers: { 'Content-Type': 'application/json' },
+            data: JSON.stringify({ email: email, otp: otp }),
+            onload: function(res) {
+                debugDiv.innerHTML = `⚙️ [Bridge] Mail: ${email}<br>✅ Đã đồng bộ OTP: ${otp}`;
+                console.log('[Bridge] Gửi OTP thành công về Tool:', email, otp);
+            },
+            onerror: function(err) {
+                debugDiv.style.background = '#ef4444';
+                debugDiv.innerHTML = `⚙️ [Bridge] Mail: ${email}<br>❌ Lỗi kết nối Bridge local!`;
+                console.error('[Bridge] Gửi OTP thất bại:', err);
+            }
+        });
+    }, 2000); // 2 giây quét 1 lần để nhạy bén tối đa
+})();

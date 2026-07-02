@@ -1,0 +1,337 @@
+// ==UserScript==
+// @name         Capital One Shopping Auto Login & Change Password (API Sync)
+// @namespace    http://tampermonkey.net/
+// @version      1.1
+// @description  Tu dong dang nhap bang email + MK Capital cu, tu dong doi MK, hoac tu dong check dang nhap
+// @author       Antigravity AI
+// @match        https://*.capitaloneshopping.com/*
+// @match        https://capitaloneshopping.com/*
+// @grant        GM_xmlhttpRequest
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @connect      127.0.0.1
+// @connect      localhost
+// @run-at       document-end
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    let debugDiv = null;
+    let isClickingDiffWay = false;
+    let isReported = false;
+
+    function initDebug() {
+        if (debugDiv) return;
+        debugDiv = document.createElement('div');
+        debugDiv.style.position = 'fixed';
+        debugDiv.style.top = '10px';
+        debugDiv.style.right = '10px';
+        debugDiv.style.background = '#0f172a';
+        debugDiv.style.color = 'white';
+        debugDiv.style.padding = '12px 16px';
+        debugDiv.style.borderRadius = '8px';
+        debugDiv.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';
+        debugDiv.style.zIndex = '9999999';
+        debugDiv.style.fontSize = '13px';
+        debugDiv.style.fontFamily = 'monospace';
+        debugDiv.style.lineHeight = '1.5';
+        debugDiv.style.maxWidth = '400px';
+        debugDiv.style.wordBreak = 'break-all';
+        debugDiv.innerHTML = '[Capital One Shopping] Dang khoi dong...';
+        document.body.appendChild(debugDiv);
+    }
+
+    function setDebug(msg, color = '#0f172a') {
+        if (!debugDiv) initDebug();
+        debugDiv.style.background = color;
+        debugDiv.innerHTML = '[Capital One Shopping]<br>' + msg;
+    }
+
+    const API_CURRENT_ACCOUNT = 'http://127.0.0.1:3000/api/current-account';
+    const API_REPORT_RESULT = 'http://127.0.0.1:3000/api/check-capital/report';
+
+    function safeFill(element, value) {
+        if (!element) return false;
+        try {
+            element.focus();
+            const prototype = Object.getPrototypeOf(element);
+            const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+            
+            if (descriptor && descriptor.set) {
+                descriptor.set.call(element, value);
+            } else {
+                element.value = value;
+            }
+            
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+            element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: value }));
+            element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: value }));
+        } catch (e) {
+            console.error('[Tampermonkey] Loi safeFill:', e);
+            element.value = value;
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        return true;
+    }
+
+    function safeClick(element) {
+        if (!element) return false;
+        try {
+            element.focus();
+            const clickEvent = new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true,
+                view: window
+            });
+            element.dispatchEvent(clickEvent);
+            if (typeof element.click === 'function') {
+                element.click();
+            }
+        } catch (e) {
+            console.error('[Tampermonkey] Lỗi safeClick:', e);
+            try { element.click(); } catch(err) {}
+        }
+        return true;
+    }
+
+    function makeRequest(url, method, data, callback) {
+        if (typeof GM_xmlhttpRequest !== 'undefined') {
+            GM_xmlhttpRequest({
+                method: method,
+                url: url,
+                headers: { "Content-Type": "application/json" },
+                data: data ? JSON.stringify(data) : null,
+                onload: function(res) { callback(null, res.responseText); },
+                onerror: function(err) {
+                    fetch(url, {
+                        method: method,
+                        headers: data ? { "Content-Type": "application/json" } : {},
+                        body: data ? JSON.stringify(data) : null
+                    })
+                    .then(r => r.text())
+                    .then(text => callback(null, text))
+                    .catch(e => callback(e, null));
+                }
+            });
+        } else {
+            fetch(url, {
+                method: method,
+                headers: data ? { "Content-Type": "application/json" } : {},
+                body: data ? JSON.stringify(data) : null
+            })
+            .then(r => r.text())
+            .then(text => callback(null, text))
+            .catch(e => callback(e, null));
+        }
+    }
+
+    function reportResult(acc, status, errorMsg = '') {
+        if (isReported) return;
+        isReported = true;
+
+        const body = {
+            sheetId: acc.sheetId,
+            sheetName: acc.sheetName,
+            rowIndex: acc.rowIndex,
+            email: acc.email,
+            status: status,
+            error: errorMsg
+        };
+
+        setDebug(`Gui ket qua check: [${status.toUpperCase()}]...`, status === 'ok' ? '#16a34a' : '#be123c');
+
+        makeRequest(API_REPORT_RESULT, "POST", body, function(err) {
+            if (err) {
+                console.error('[Script 3] Loi gui bao cao:', err);
+            }
+            // Tu dong dong tab sau khi gui bao cao thanh cong
+            setTimeout(() => {
+                window.close();
+            }, 1000);
+        });
+    }
+
+    function checkURLHash() {
+        const hash = window.location.hash;
+        if (hash.startsWith('#check=')) {
+            try {
+                const base64Data = hash.substring(7);
+                const decodedData = decodeURIComponent(escape(atob(base64Data)));
+                return JSON.parse(decodedData);
+            } catch (e) {
+                console.error('[Script 3] Loi parse hash check:', e);
+            }
+        }
+        return null;
+    }
+
+    function initialize() {
+        initDebug();
+        
+        // 1. Kiem tra xem co phai dang o luong tu dong check khong
+        const checkAcc = checkURLHash();
+        if (checkAcc) {
+            setDebug(`Luong CHECK tu dong!<br>Acc: ${checkAcc.email}`, '#6366f1');
+            
+            // Loop de tu dong check
+            const checkInterval = setInterval(() => {
+                runStep(checkAcc, checkInterval, true);
+            }, 1500);
+            return;
+        }
+
+        // 2. Neu khong phai luong check thi chay luong doi mat khau dong bo binh thuong
+        setTimeout(() => {
+            const interval = setInterval(() => {
+                try {
+                    makeRequest(API_CURRENT_ACCOUNT, "GET", null, function(err, responseText) {
+                        if (err) {
+                            setDebug('Khong ket noi duoc voi Tool local de dong bo...', '#be123c');
+                            return;
+                        }
+                        try {
+                            const resData = JSON.parse(responseText);
+                            if (resData.success && resData.account) {
+                                const acc = resData.account;
+                                setDebug(`Dong bo OK!<br>Acc dang xu ly: ${acc.email}`, '#16a34a');
+                                runStep(acc, interval, false);
+                            } else {
+                                setDebug('Vui long click [Vao Capital] tren giao dien Tool de truyen thong tin...');
+                            }
+                        } catch (e) {
+                            console.error('Loi parse config:', e);
+                        }
+                    });
+                } catch (e) {
+                    setDebug('Loi vong lap: ' + e.message, '#be123c');
+                }
+            }, 1000);
+        }, 1000);
+    }
+
+    if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', initialize);
+    } else {
+        initialize();
+    }
+
+    function runStep(acc, interval, isAutoCheck = false) {
+        const path = window.location.pathname;
+        const host = window.location.host;
+
+        // Kiem tra loi dang nhap truoc
+        const bodyText = (document.body.innerText || '').toLowerCase();
+        const isWrongCredsText = bodyText.includes('incorrect') || 
+                                 bodyText.includes("don't recognize") ||
+                                 bodyText.includes("invalid") ||
+                                 bodyText.includes("wrong email") ||
+                                 bodyText.includes("incorrect password");
+
+        if (isAutoCheck && isWrongCredsText) {
+            clearInterval(interval);
+            reportResult(acc, 'error', 'Sai tai khoan hoac mat khau Capital One');
+            return;
+        }
+
+        const isLoginPage = path.includes('/auth/signin') || 
+                            path.includes('/sign-in') || 
+                            path.includes('/login') || 
+                            document.getElementById('id_email') !== null ||
+                            document.querySelector('input[type="email"]') !== null ||
+                            Array.from(document.querySelectorAll('button, a, span')).some(el => (el.textContent || '').toLowerCase().includes('sign in a different way'));
+
+        if (isLoginPage) {
+            // Tim cac input dang hien thi tren man hinh
+            const emailInput = Array.from(document.querySelectorAll('input[type="email"], input[id*="email"], input[name*="email"]'))
+                                    .find(el => el.offsetWidth > 0 && el.offsetHeight > 0) ||
+                               document.querySelector('input[type="email"]');
+
+            const passInput = Array.from(document.querySelectorAll('input[type="password"], input[id*="password"], input[name*="password"]'))
+                                   .find(el => el.offsetWidth > 0 && el.offsetHeight > 0) ||
+                              document.querySelector('input[type="password"]');
+
+            if (!passInput || passInput.offsetWidth === 0) {
+                if (isClickingDiffWay) return;
+                
+                const diffWayBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                    const txt = (btn.textContent || '').trim().toLowerCase();
+                    return btn.classList.contains('sign-in-secondary-link') || txt.includes('sign in a different way');
+                });
+                
+                if (diffWayBtn && diffWayBtn.offsetWidth > 0) {
+                    setDebug('Click [Sign in a different way]...', '#0284c7');
+                    isClickingDiffWay = true;
+                    safeClick(diffWayBtn);
+                    setTimeout(() => { isClickingDiffWay = false; }, 4000);
+                    return;
+                }
+            }
+
+            if (emailInput && emailInput.offsetWidth > 0) {
+                if (emailInput.value !== acc.email) {
+                    setDebug(`Dang dien Email: ${acc.email}`, '#0284c7');
+                    safeFill(emailInput, acc.email);
+                }
+            }
+
+            if (passInput && passInput.offsetWidth > 0 && acc.mkCapital) {
+                if (passInput.value !== acc.mkCapital) {
+                    setDebug('Dang dien Mat khau Capital cu...', '#0284c7');
+                    safeFill(passInput, acc.mkCapital);
+                }
+            }
+
+            let loginBtn = document.querySelector('button[type="submit"].sign-in-primary-btn') || 
+                           document.querySelector('button[type="submit"]');
+            
+            if (!loginBtn) {
+                loginBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                    const txt = (btn.textContent || '').trim().toLowerCase();
+                    return btn.offsetWidth > 0 && (txt === 'sign in' || (txt.includes('sign in') && !txt.includes('link') && !txt.includes('different') && !txt.includes('way')));
+                });
+            }
+
+            if (loginBtn && emailInput && emailInput.value.length > 0 && (passInput ? passInput.value.length > 0 : true)) {
+                setDebug('Click [Sign In/Continue]...', '#16a34a');
+                safeClick(loginBtn);
+                return;
+            }
+            return;
+        }
+
+        // Kiem tra trang thai dang nhap thanh cong
+        const hasUserMenu = document.querySelector('[data-testid="account-nav-menu"]') || 
+                            document.getElementById('radix-_r_0_') || 
+                            Array.from(document.querySelectorAll('button')).some(btn => {
+                                return btn.getAttribute('aria-haspopup') === 'menu' || btn.getAttribute('aria-expanded') !== null;
+                            });
+
+        if (hasUserMenu || (path !== '/sign-in' && !path.includes('/sign-in') && !path.includes('/auth/signin'))) {
+            clearInterval(interval);
+            if (isAutoCheck) {
+                // Neu dang o luong check tu dong, bao cao ket qua OK va dong tab
+                reportResult(acc, 'ok');
+            } else {
+                setDebug('Dang nhap thanh cong! Dang chuyen huong sang trang Profile...', '#16a34a');
+                window.location.href = 'https://capitaloneshopping.com/account-settings/profile';
+            }
+            return;
+        }
+
+        const signInLink = Array.from(document.querySelectorAll('a, button')).find(el => {
+            const txt = (el.textContent || '').trim().toLowerCase();
+            const href = el.getAttribute('href') || '';
+            const isClassSignIn = el.className && typeof el.className === 'string' && el.className.toLowerCase().includes('signin');
+            return el.offsetWidth > 0 && (href === '/sign-in' || txt === 'sign in' || isClassSignIn);
+        });
+
+        if (signInLink && signInLink.offsetWidth > 0) {
+            setDebug('Click chuyen huong den trang [Sign In]...', '#0284c7');
+            safeClick(signInLink);
+            return;
+        }
+    }
+})();

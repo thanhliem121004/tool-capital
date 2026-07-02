@@ -1,0 +1,1785 @@
+﻿========================================================================
+     DANH SACH 4 SCRIPT TAMPERMONKEY CAN CAI DAT (DONG BO 100% KHONG LOI)
+========================================================================
+
+Ban can cai dat ca 4 script duoi day vao Tampermonkey de he thong tu dong hoa hoat dong tron tru.
+Co the copy tung phan duoi day va add moi vao Tampermonkey.
+
+========================================================================
+
+========================================================================
+  1. SCRIPT 1: HOTMAIL AUTO LOGIN & ADD RECOVERY (AUTO RUN)
+========================================================================
+// ==UserScript==
+// @name         Hotmail Autocompletion & Auto Change Settings (API Sync 5.18)
+// @namespace    http://tampermonkey.net/
+// @version      5.18
+// @description  Bypass rate limit inboxes.com báº±ng cÃ¡ch cÃ o thÆ° trá»±c tiáº¿p qua GM_xmlhttpRequest tá»« client-side
+// @author       Antigravity AI
+// @match        https://login.live.com/*
+// @match        https://account.live.com/*
+// @grant        GM_xmlhttpRequest
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @connect      127.0.0.1
+// @connect      localhost
+// @connect      inboxes.com
+// @connect      smvmail.com
+// @run-at       document-start
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    let debugDiv = null;
+    function initDebug() {
+        if (debugDiv) return;
+        debugDiv = document.createElement('div');
+        debugDiv.style.position = 'fixed';
+        debugDiv.style.top = '10px';
+        debugDiv.style.left = '10px';
+        debugDiv.style.background = '#e11d48';
+        debugDiv.style.color = 'white';
+        debugDiv.style.padding = '12px 16px';
+        debugDiv.style.borderRadius = '8px';
+        debugDiv.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';
+        debugDiv.style.zIndex = '9999999';
+        debugDiv.style.fontSize = '13px';
+        debugDiv.style.fontFamily = 'monospace';
+        debugDiv.style.lineHeight = '1.5';
+        debugDiv.style.maxWidth = '400px';
+        debugDiv.style.wordBreak = 'break-all';
+        debugDiv.innerHTML = 'âš™ï¸ [Debugger] Äang khá»Ÿi Ä‘á»™ng...';
+        document.body.appendChild(debugDiv);
+    }
+
+    function setDebug(msg, color = '#e11d48') {
+        if (!debugDiv) initDebug();
+        debugDiv.style.background = color;
+        debugDiv.innerHTML = 'âš™ï¸ [Debugger]<br>' + msg;
+    }
+
+    const API_OTP_BRIDGE = 'http://127.0.0.1:3000/api/otp-bridge';
+    const API_CURRENT_ACCOUNT = 'http://127.0.0.1:3000/api/current-account';
+
+    function safeFill(element, value) {
+        if (!element) return false;
+        try {
+            element.focus();
+            const prototype = Object.getPrototypeOf(element);
+            const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+            
+            if (descriptor && descriptor.set) {
+                descriptor.set.call(element, value);
+            } else {
+                element.value = value;
+            }
+            
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+            element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: value }));
+            element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: value }));
+        } catch (e) {
+            console.error('[Tampermonkey] Lá»—i safeFill:', e);
+            element.value = value;
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        return true;
+    }
+
+    function safeClick(element) {
+        if (!element) return false;
+        try {
+            element.focus();
+            const clickEvent = new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true,
+                view: window
+            });
+            element.dispatchEvent(clickEvent);
+            if (typeof element.click === 'function') {
+                element.click();
+            }
+        } catch (e) {
+            console.error('[Tampermonkey] Lá»—i safeClick:', e);
+            element.click();
+        }
+        return true;
+    }
+
+    function makeRequest(url, method, data, callback) {
+        if (typeof GM_xmlhttpRequest !== 'undefined') {
+            GM_xmlhttpRequest({
+                method: method,
+                url: url,
+                headers: { "Content-Type": "application/json" },
+                data: data ? JSON.stringify(data) : null,
+                onload: function(res) { callback(null, res.responseText); },
+                onerror: function(err) {
+                    fetch(url, {
+                        method: method,
+                        headers: data ? { "Content-Type": "application/json" } : {},
+                        body: data ? JSON.stringify(data) : null
+                    })
+                    .then(r => r.text())
+                    .then(text => callback(null, text))
+                    .catch(e => callback(e, null));
+                }
+            });
+        }
+    }
+
+    function getEmailOnScreen() {
+        const banner = document.querySelector('#identityBanner, .identity, #displayName, #emailDisplayName, .use_another_account, .username');
+        if (banner && banner.textContent) {
+            const emailMatch = banner.textContent.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
+            if (emailMatch) return emailMatch[0].toLowerCase().trim();
+        }
+        
+        const matches = document.body.innerText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/g);
+        if (matches) {
+            const mainEmail = matches.find(m => m.toLowerCase().endsWith('hotmail.com') || m.toLowerCase().endsWith('outlook.com') || m.toLowerCase().endsWith('live.com'));
+            if (mainEmail) return mainEmail.toLowerCase().trim();
+        }
+        return null;
+    }
+
+    function isOldRecoveryEmail(emailText, acc) {
+        const emailLower = emailText.toLowerCase().trim();
+        if (acc.email && emailLower === acc.email.toLowerCase().trim()) return false;
+        if (acc.recovery && emailLower === acc.recovery.toLowerCase().trim()) return false;
+        
+        const newDomains = ['smvmail.com', 'fivermail.com', 'fviainboxes.com', 'fviadropinbox.com', 'fviamail.work', 'dropinboxes.com'];
+        const hasNewDomain = newDomains.some(d => emailLower.endsWith('@' + d));
+        
+        if (emailLower.includes('@') && !hasNewDomain) {
+            return true;
+        }
+        return false;
+    }
+
+    function hasOtpErrorOnPage() {
+        const errorEl = document.getElementById('idDiv_SAOTCC_Error') || 
+                        document.getElementById('idDiv_SAOTCS_Error') ||
+                        document.querySelector('.alert-error') ||
+                        document.querySelector('[id*="error"]') ||
+                        document.querySelector('[class*="error"]');
+        if (errorEl && errorEl.offsetWidth > 0) {
+            const txt = (errorEl.textContent || '').toLowerCase();
+            if (txt.includes('khÃ´ng hoáº¡t Ä‘á»™ng') || txt.includes('khÃ´ng há»£p lá»‡') || txt.includes('khÃ´ng Ä‘Ãºng') || 
+                txt.includes("didn't work") || txt.includes('incorrect') || txt.includes('invalid') || txt.includes('mÃ£')) {
+                return true;
+            }
+        }
+        
+        const pageText = (document.body.innerText || '').toLowerCase();
+        return pageText.includes('khÃ´ng hoáº¡t Ä‘á»™ng') || 
+               pageText.includes('khÃ´ng há»£p lá»‡') || 
+               pageText.includes("didn't work") || 
+               pageText.includes('incorrect code') || 
+               pageText.includes('invalid code') ||
+               pageText.includes('mÃ£ Ä‘Ã³ khÃ´ng hoáº¡t Ä‘á»™ng') ||
+               pageText.includes('mÃ£ khÃ´ng Ä‘Ãºng');
+    }
+
+    function extractOtpFromHtml(html, text) {
+        if (text) {
+            const matches = text.match(/\b\d{6}\b/g);
+            if (matches) {
+                const otp = matches.find(m => m !== '707070');
+                if (otp) return otp;
+            }
+        }
+        let cleaned = html || '';
+        cleaned = cleaned.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+        cleaned = cleaned.replace(/style="[^"]*"/gi, '');
+        cleaned = cleaned.replace(/style='[^']*'/gi, '');
+        cleaned = cleaned.replace(/<[^>]+>/g, ' ');
+        const matchesCleaned = cleaned.match(/\b\d{6}\b/g);
+        if (matchesCleaned) {
+            const otp = matchesCleaned.find(m => m !== '707070');
+            return otp || matchesCleaned[0];
+        }
+        return null;
+    }
+
+    // HÃ€M CÃ€O OTP TRá»°C TIáº¾P Tá»ª CLIENT-SIDE Báº°NG GM_xmlhttpRequest (BYPASS CLOUDFLARE/RATE LIMIT)
+    function fetchOtpFromInboxesOrSmv(email, callback) {
+        const domain = email.split('@')[1]?.toLowerCase() || '';
+        const isSmv = domain === 'smvmail.com';
+
+        if (isSmv) {
+            const url = `https://smvmail.com/api/email?page=1&q=&email=${encodeURIComponent(email)}&_t=${Date.now()}`;
+            GM_xmlhttpRequest({
+                method: "GET",
+                url: url,
+                headers: {
+                    "Accept": "application/json, text/plain, */*",
+                    "User-Agent": navigator.userAgent
+                },
+                onload: function(res) {
+                    try {
+                        const json = JSON.parse(res.responseText);
+                        const docs = json.data?.docs || json.data?.data?.docs || json.docs || [];
+                        let foundOtp = null;
+                        for (const doc of docs) {
+                            const subject = (doc.subject || '').toLowerCase();
+                            if (subject.includes('microsoft') || (doc.text && doc.text.toLowerCase().includes('microsoft')) || (doc.html && doc.html.toLowerCase().includes('microsoft'))) {
+                                foundOtp = extractOtpFromHtml(doc.html, doc.text);
+                                if (foundOtp) break;
+                            }
+                        }
+                        callback(null, foundOtp);
+                    } catch(e) {
+                        callback(e, null);
+                    }
+                },
+                onerror: function(err) { callback(err, null); }
+            });
+        } else {
+            const listUrl = `https://inboxes.com/api/v2/inbox/${encodeURIComponent(email)}?_t=${Date.now()}`;
+            GM_xmlhttpRequest({
+                method: "GET",
+                url: listUrl,
+                headers: {
+                    "Accept": "application/json, text/plain, */*",
+                    "User-Agent": navigator.userAgent
+                },
+                onload: function(res) {
+                    try {
+                        const data = JSON.parse(res.responseText);
+                        const messages = data.msgs || [];
+                        let targetMsg = messages.find(msg => msg.f && msg.f.toLowerCase().includes('microsoft'));
+                        
+                        if (targetMsg) {
+                            const bodyUrl = `https://inboxes.com/api/v2/message/${encodeURIComponent(targetMsg.uid)}`;
+                            GM_xmlhttpRequest({
+                                method: "GET",
+                                url: bodyUrl,
+                                headers: {
+                                    "Accept": "application/json, text/plain, */*",
+                                    "User-Agent": navigator.userAgent
+                                },
+                                onload: function(bodyRes) {
+                                    try {
+                                        const bodyData = JSON.parse(bodyRes.responseText);
+                                        const foundOtp = extractOtpFromHtml(bodyData.html, bodyData.text);
+                                        callback(null, foundOtp);
+                                    } catch(e) {
+                                        callback(e, null);
+                                    }
+                                },
+                                onerror: function(err) { callback(err, null); }
+                            });
+                        } else {
+                            callback(null, null);
+                        }
+                    } catch(e) {
+                        callback(e, null);
+                    }
+                },
+                onerror: function(err) { callback(err, null); }
+            });
+        }
+    }
+
+    const hash = window.location.hash;
+    if (hash && hash.includes('acc=')) {
+        try {
+            const base64Str = hash.split('acc=')[1].split('&')[0];
+            const jsonStr = decodeURIComponent(escape(atob(base64Str)));
+            const data = JSON.parse(jsonStr);
+            if (data && data.email) {
+                const keyEmail = data.email.toLowerCase().trim();
+                sessionStorage.setItem("active_email", keyEmail);
+                GM_setValue("acc_" + keyEmail, data);
+                GM_setValue("last_active_email", keyEmail);
+                GM_setValue("active_account", data);
+                console.log('[Tampermonkey] ÄÃ£ khÃ³a tÃ i khoáº£n thÃ nh cÃ´ng cho tab nÃ y:', keyEmail);
+            }
+        } catch (e) {
+            console.error('[Tampermonkey] Lá»—i parse Hash URL:', e);
+        }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        initDebug();
+        
+        setTimeout(() => {
+            const interval = setInterval(() => {
+                try {
+                    let currentEmail = sessionStorage.getItem("active_email");
+                    if (!currentEmail) {
+                        currentEmail = getEmailOnScreen();
+                    }
+                    if (!currentEmail) {
+                        currentEmail = GM_getValue("last_active_email", "");
+                    }
+
+                    if (hasOtpErrorOnPage()) {
+                        const lastErr = Number(sessionStorage.getItem("last_otp_error_time") || 0);
+                        if (Date.now() - lastErr > 45000) {
+                            sessionStorage.setItem("last_otp_error_time", Date.now());
+                        }
+                    }
+
+                    let acc = currentEmail ? GM_getValue("acc_" + currentEmail.toLowerCase().trim(), null) : null;
+                    if (!acc) {
+                        acc = GM_getValue("active_account", null);
+                    }
+
+                    if (!acc) {
+                        makeRequest(API_CURRENT_ACCOUNT, "GET", null, function(err, responseText) {
+                            if (err) return;
+                            try {
+                                const resData = JSON.parse(responseText);
+                                if (resData.success && resData.account) {
+                                    acc = resData.account;
+                                    const keyEmail = acc.email.toLowerCase().trim();
+                                    sessionStorage.setItem("active_email", keyEmail);
+                                    GM_setValue("acc_" + keyEmail, acc);
+                                    GM_setValue("last_active_email", keyEmail);
+                                    GM_setValue("active_account", acc);
+                                    setDebug(`Äá»“ng bá»™ OK! (Fallback API) ðŸš€<br>ðŸ“§ Äang xá»­ lÃ½: ${acc.email}`, '#16a34a');
+                                    runStep(acc, interval);
+                                } else {
+                                    setDebug(`âš ï¸ KhÃ´ng tÃ¬m tháº¥y cáº¥u hÃ¬nh cho tÃ i khoáº£n hoáº¡t Ä‘á»™ng`);
+                                }
+                            } catch (e) {
+                                console.error('Lá»—i parse fallback config:', e);
+                            }
+                        });
+                    } else {
+                        if (acc.email) {
+                            const keyEmail = acc.email.toLowerCase().trim();
+                            if (sessionStorage.getItem("active_email") !== keyEmail) {
+                                sessionStorage.setItem("active_email", keyEmail);
+                            }
+                        }
+                        setDebug(`Äá»“ng bá»™ OK! ðŸš€<br>ðŸ“§ Äang xá»­ lÃ½: ${acc.email}`, '#16a34a');
+                        runStep(acc, interval);
+                    }
+
+                } catch (e) {
+                    setDebug('Lá»—i vÃ²ng láº·p: ' + e.message, '#be123c');
+                }
+            }, 800);
+        }, 800);
+    });
+
+    function runStep(acc, interval) {
+        const isAccountPage = window.location.host.includes('account.live.com');
+        if (isAccountPage) {
+            runAccountSecurityStep(acc, interval);
+        } else {
+            runLoginStep(acc, interval);
+        }
+    }
+
+    function runLoginStep(acc, interval) {
+        const email = acc.email;
+        const pass = acc.password;
+        const old_recovery = acc.oldRecovery;
+
+        const singleInput = document.querySelector('input[name="otc"], input#idTxtBx_SAOTCC_OTC, input#otcTextBox');
+        const allTelInputs = Array.from(document.querySelectorAll('input')).filter(el => 
+            el.offsetWidth > 0 && 
+            el.type !== 'hidden' && 
+            (el.name?.includes('otc') || el.id?.includes('otc') || el.maxLength === 1 || el.type === 'tel')
+        );
+
+        if (singleInput || allTelInputs.length > 0) {
+            handleLoginOtp(acc, singleInput, allTelInputs);
+            return;
+        }
+
+        const kmsiTitle = document.querySelector('#kmsiTitle, .kmsi');
+        if (kmsiTitle) {
+            const staySignedBtn = document.querySelector('#idSIButton9, button[type="submit"], input[type="submit"]');
+            if (staySignedBtn) {
+                setDebug(`ðŸšª Duy trÃ¬ Ä‘Äƒng nháº­p (KMSI)...`, '#16a34a');
+                safeClick(staySignedBtn);
+                clearInterval(interval);
+            }
+            return;
+        }
+
+        const sendCodeBtn = Array.from(document.querySelectorAll('input[type="submit"], input[type="button"], button')).find(el => {
+            const txt = (el.textContent || el.value || '').trim().toLowerCase();
+            return txt === 'gá»­i mÃ£' || txt === 'send code' || txt.includes('gá»­i mÃ£') || txt.includes('send code');
+        });
+
+        const nextBtn = document.querySelector('input[type="submit"], button[type="submit"], #idSIButton9, button#submitBtn');
+        const emailInput = document.querySelector('input[type="email"], input[name="loginfmt"], input#i0116');
+        const passInput = document.querySelector('input[type="password"], input[name="passwd"], input#passwordEntry');
+        
+        let emailConfirmInput = document.querySelector('input[name="proof"], input#i0027, input#otcEmail, input#emailTxt, input#i0118:not([type="password"])');
+        if (!emailConfirmInput && sendCodeBtn) {
+            emailConfirmInput = Array.from(document.querySelectorAll('input')).find(el => 
+                el.offsetWidth > 0 && 
+                el.type !== 'password' && 
+                el.type !== 'checkbox' && 
+                el.type !== 'submit' && 
+                el.type !== 'button' && 
+                el.type !== 'hidden' &&
+                !el.id.includes('otc') &&
+                el.maxLength !== 1
+            );
+        }
+
+        const switchToPasswordLink = Array.from(document.querySelectorAll('a, button, input, [role="button"], [role="link"], #idA_PWD_SwitchToPassword')).find(el => {
+            const txt = (el.textContent || el.value || '').trim().toLowerCase();
+            return el.id === 'idA_PWD_SwitchToPassword' || 
+                   txt.includes('sá»­ dá»¥ng máº­t kháº©u') || 
+                   txt.includes('use your password') ||
+                   txt.includes('use a password') ||
+                   txt.includes('máº­t kháº©u cá»§a báº¡n');
+        });
+        if (switchToPasswordLink && (!passInput || passInput.offsetWidth === 0)) {
+            setDebug(`ðŸ”— Click [Sá»­ dá»¥ng máº­t kháº©u]...`, '#0284c7');
+            safeClick(switchToPasswordLink);
+            return;
+        }
+
+        if (emailInput && emailInput.offsetWidth > 0 && (!passInput || passInput.offsetWidth === 0) && !emailConfirmInput) {
+            if (emailInput.value !== email) {
+                setDebug(`ðŸ“§ Äang Ä‘iá»n Email: ${email}`, '#0284c7');
+                safeFill(emailInput, email);
+            } else {
+                if (nextBtn) {
+                    setDebug(`ðŸ–±ï¸ Email Ä‘Ã£ Ä‘iá»n. Click Tiáº¿p theo...`, '#0284c7');
+                    safeClick(nextBtn);
+                }
+            }
+            return;
+        }
+
+        if (passInput && passInput.offsetWidth > 0 && !emailConfirmInput) {
+            if (passInput.value !== pass) {
+                setDebug(`ðŸ”‘ Äang Ä‘iá»n Password...`, '#0284c7');
+                safeFill(passInput, pass);
+            } else {
+                const signInBtn = document.querySelector('input[type="submit"], button[type="submit"], #idSIButton9, button#submitBtn');
+                if (signInBtn) {
+                    setDebug(`ðŸ–±ï¸ Password Ä‘Ã£ Ä‘iá»n. Click ÄÄƒng nháº­p...`, '#0284c7');
+                    safeClick(signInBtn);
+                }
+            }
+            return;
+        }
+
+        if (!emailConfirmInput) {
+            const sendCodeTile = Array.from(document.querySelectorAll('.tile-layout, .tile, [role="button"], a')).find(el => 
+                el.textContent.includes('trangcode.com') || 
+                el.textContent.includes('Gá»­i mÃ£ Ä‘áº¿n') || 
+                el.textContent.includes('Send code to') ||
+                (old_recovery && el.textContent.includes(old_recovery.substring(0, 2)))
+            );
+            if (sendCodeTile) {
+                setDebug(`ðŸ“¬ Äang chá»n gá»­i mÃ£ Ä‘áº¿n Mail cÅ©...`, '#0284c7');
+                safeClick(sendCodeTile);
+                return;
+            }
+        }
+
+        if (emailConfirmInput) {
+            if (emailConfirmInput.value !== old_recovery) {
+                setDebug(`ðŸ“¬ Äiá»n xÃ¡c nháº­n Mail cÅ©: ${old_recovery}`, '#0284c7');
+                safeFill(emailConfirmInput, old_recovery);
+            } else {
+                if (sendCodeBtn) {
+                    setDebug(`ðŸ–±ï¸ Click gá»­i mÃ£ OTP...`, '#0284c7');
+                    safeClick(sendCodeBtn);
+                }
+            }
+            return;
+        }
+    }
+
+    function handleLoginOtp(acc, singleInput, allTelInputs) {
+        const lastErrorTime = Number(sessionStorage.getItem("last_otp_error_time") || 0);
+        const secondsPassed = (Date.now() - lastErrorTime) / 1000;
+        if (secondsPassed < 35) {
+            const waitSeconds = Math.ceil(35 - secondsPassed);
+            setDebug(`â³ PhÃ¡t hiá»‡n nháº­p sai mÃ£. Táº¡m ngÆ°ng ${waitSeconds}s Ä‘á»ƒ chá» mÃ£ má»›i...`, '#d97706');
+            return;
+        }
+
+        const pageText = (document.body.innerText || '').toLowerCase();
+        let targetOtpEmail = acc.oldRecovery;
+
+        if (acc.recovery) {
+            const newRecLower = acc.recovery.toLowerCase();
+            const newPrefix = newRecLower.substring(0, 3);
+            const newDomain = newRecLower.split('@')[1] || '';
+            if (pageText.includes(newPrefix) && pageText.includes(newDomain)) {
+                targetOtpEmail = acc.recovery;
+            }
+        }
+
+        if (targetOtpEmail !== acc.recovery && acc.oldRecovery) {
+            const oldRecLower = acc.oldRecovery.toLowerCase();
+            const oldPrefix = oldRecLower.substring(0, 3);
+            const oldDomain = oldRecLower.split('@')[1] || '';
+            if (pageText.includes(oldPrefix) && pageText.includes(oldDomain)) {
+                targetOtpEmail = acc.oldRecovery;
+            }
+        }
+
+        setDebug(`â³ Äang cÃ o OTP trá»±c tiáº¿p tá»«: ${targetOtpEmail}...`, '#d97706');
+        fetchOtpFromInboxesOrSmv(targetOtpEmail, function(err, otp) {
+            if (otp) {
+                makeRequest(API_OTP_BRIDGE, "POST", { email: targetOtpEmail, otp: otp }, function() {});
+                
+                if (allTelInputs.length === otp.length) {
+                    setDebug(`ðŸ” Äiá»n OTP chia nhá»: ${otp}`, '#16a34a');
+                    let filledAll = true;
+                    for (let i = 0; i < allTelInputs.length; i++) {
+                        if (allTelInputs[i].value !== otp[i]) {
+                            safeFill(allTelInputs[i], otp[i]);
+                            filledAll = false;
+                        }
+                    }
+                    if (filledAll) {
+                        const verifyBtn = document.querySelector('input[type="submit"], button[type="submit"], #idSIButton9, #submitBtn');
+                        if (verifyBtn) {
+                            safeClick(verifyBtn);
+                        }
+                    }
+                } else if (singleInput && singleInput.value !== otp) {
+                    setDebug(`ðŸ” Äiá»n OTP Ä‘Æ¡n láº»: ${otp}`, '#16a34a');
+                    safeFill(singleInput, otp);
+                    setTimeout(() => {
+                        const verifyBtn = document.querySelector('input[type="submit"], button[type="submit"], #idSIButton9, #submitBtn');
+                        if (verifyBtn) {
+                            safeClick(verifyBtn);
+                        }
+                    }, 500);
+                }
+            } else {
+                makeRequest(`${API_OTP_BRIDGE}?email=${encodeURIComponent(targetOtpEmail || '')}`, "GET", null, function(err, responseText) {
+                    if (err) return;
+                    try {
+                        const data = JSON.parse(responseText);
+                        if (data.success && data.otp) {
+                            if (allTelInputs.length === data.otp.length) {
+                                setDebug(`ðŸ” Äiá»n OTP chia nhá» tá»« bridge: ${data.otp}`, '#16a34a');
+                                let filledAll = true;
+                                for (let i = 0; i < allTelInputs.length; i++) {
+                                    if (allTelInputs[i].value !== data.otp[i]) {
+                                        safeFill(allTelInputs[i], data.otp[i]);
+                                        filledAll = false;
+                                    }
+                                }
+                                if (filledAll) {
+                                    const verifyBtn = document.querySelector('input[type="submit"], button[type="submit"], #idSIButton9, #submitBtn');
+                                    if (verifyBtn) {
+                                        safeClick(verifyBtn);
+                                    }
+                                }
+                            } else if (singleInput && singleInput.value !== data.otp) {
+                                setDebug(`ðŸ” Äiá»n OTP Ä‘Æ¡n láº» tá»« bridge: ${data.otp}`, '#16a34a');
+                                safeFill(singleInput, data.otp);
+                                setTimeout(() => {
+                                    const verifyBtn = document.querySelector('input[type="submit"], button[type="submit"], #idSIButton9, #submitBtn');
+                                    if (verifyBtn) {
+                                        safeClick(verifyBtn);
+                                    }
+                                }, 500);
+                            }
+                        }
+                    } catch (e) {}
+                });
+            }
+        });
+    }
+
+    function runAccountSecurityStep(acc, interval) {
+        const newPassInput = document.getElementById('iPassword');
+        const retypePassInput = document.getElementById('iRetypePassword');
+        const updatePassBtn = document.getElementById('UpdatePasswordAction');
+        
+        if (newPassInput && retypePassInput && acc.newPassword) {
+            if (newPassInput.value !== acc.newPassword) {
+                setDebug(`ðŸ”‘ Äang Ä‘iá»n máº­t kháº©u má»›i...`, '#0284c7');
+                safeFill(newPassInput, acc.newPassword);
+                safeFill(retypePassInput, acc.newPassword);
+            } else {
+                if (updatePassBtn) {
+                    setDebug(`ðŸ’¾ Äang lÆ°u máº­t kháº©u má»›i...`, '#16a34a');
+                    safeClick(updatePassBtn);
+                }
+            }
+            return;
+        }
+
+        const actionBtn = document.getElementById('iBtn_action');
+        if (actionBtn && actionBtn.offsetWidth > 0) {
+            setDebug(`ðŸ–±ï¸ Click XÃ¡c nháº­n XÃ³a / OK...`, '#16a34a');
+            safeClick(actionBtn);
+            return;
+        }
+
+        const singleInput = document.querySelector('input[name="code"], input[name="verificationCode"], input#VerificationCode, input#iOttText, input[name="iOttText"]');
+        if (singleInput && singleInput.offsetWidth > 0) {
+            handleAccountOtp(acc, singleInput);
+            return;
+        }
+
+        const pageText = document.body.innerText || '';
+
+        const emailElementsAll = Array.from(document.querySelectorAll('*')).filter(el => {
+            return el.children.length === 0 && el.textContent && el.textContent.includes('@') && el.textContent.includes('.');
+        });
+        
+        let actualHasNewRecovery = false;
+        const newDomains = ['smvmail.com', 'fivermail.com', 'fviainboxes.com', 'fviadropinbox.com', 'fviamail.work', 'dropinboxes.com'];
+        for (const el of emailElementsAll) {
+            const txt = el.textContent.toLowerCase().trim();
+            if (newDomains.some(d => txt.endsWith('@' + d))) {
+                actualHasNewRecovery = true;
+                break;
+            }
+        }
+        
+        const hasNewRecoveryOnPage = actualHasNewRecovery || (acc.recovery && pageText.toLowerCase().includes(acc.recovery.toLowerCase()));
+
+        const recoveryInputs = Array.from(document.querySelectorAll('input[type="email"], input[name="EmailAddress"], input[name="email"], input[placeholder*="example.com"], #EmailAddress, #emailAddress'));
+        const recoveryInput = recoveryInputs.find(el => el.offsetWidth > 0);
+        
+        if (!hasNewRecoveryOnPage && recoveryInput && acc.recovery && recoveryInput.value !== acc.recovery) {
+            setDebug(`ðŸ“¬ Äiá»n Email khÃ´i phá»¥c má»›i: ${acc.recovery}`, '#0284c7');
+            safeFill(recoveryInput, acc.recovery);
+            
+            let nextBtn = document.querySelector('input[type="submit"], button[type="submit"], #submitButton, #idSIButton9');
+            if (!nextBtn) {
+                nextBtn = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"]')).find(btn => {
+                    const txt = (btn.textContent || btn.value || '').trim().toLowerCase();
+                    return txt === 'tiáº¿p theo' || txt === 'next' || txt.includes('tiáº¿p') || txt.includes('next');
+                });
+            }
+            
+            if (nextBtn) {
+                setTimeout(() => safeClick(nextBtn), 600);
+            }
+            return;
+        }
+
+        if (!hasNewRecoveryOnPage && !recoveryInput) {
+            const addMethodLink = Array.from(document.querySelectorAll('a, button, [role="button"], span')).find(el => {
+                const txt = (el.textContent || '').trim().toLowerCase();
+                return txt.includes('thÃªm má»™t cÃ¡ch Ä‘Äƒng nháº­p') || txt.includes('add a new way to sign in');
+            });
+            
+            if (addMethodLink) {
+                let emailOption = document.getElementById('Add_email') || document.getElementById('Email');
+                
+                if (!emailOption) {
+                    emailOption = Array.from(document.querySelectorAll('a, button, [role="button"], span, div')).find(el => {
+                        const txt = (el.textContent || '').trim().toLowerCase();
+                        const isEmailMatch = txt.includes('gá»­i mÃ£ qua email') || txt.includes('email a code');
+                        
+                        if (isEmailMatch) {
+                            let parent = el.parentElement;
+                            for (let depth = 0; depth < 3 && parent; depth++) {
+                                const parentTxt = (parent.textContent || '').toLowerCase();
+                                if (parentTxt.includes('@') || (acc.oldRecovery && parentTxt.includes(acc.oldRecovery.toLowerCase()))) {
+                                    return false;
+                                }
+                                parent = parent.parentElement;
+                            }
+                            return true;
+                        }
+                        return false;
+                    });
+                }
+                
+                if (emailOption) {
+                    let clickableEl = emailOption;
+                    let parent = emailOption.parentElement;
+                    for (let depth = 0; depth < 3 && parent; depth++) {
+                        if (parent.id === 'Add_email' || parent.id === 'Email' || parent.getAttribute('role') === 'button' || parent.tagName === 'A' || parent.tagName === 'BUTTON') {
+                            clickableEl = parent;
+                            break;
+                        }
+                        parent = parent.parentElement;
+                    }
+                    
+                    setDebug(`ðŸ“¬ Click chá»n Gá»­i mÃ£ qua email...`, '#0284c7');
+                    safeClick(clickableEl);
+                } else {
+                    setDebug(`âž• Click thÃªm cÃ¡ch Ä‘Äƒng nháº­p...`, '#0284c7');
+                    safeClick(addMethodLink);
+                }
+                return;
+            }
+        }
+
+        let hasOldRecoveryOnPage = false;
+        const emailElements = Array.from(document.querySelectorAll('*')).filter(el => {
+            return el.children.length === 0 && 
+                   el.textContent && 
+                   isOldRecoveryEmail(el.textContent, acc);
+        });
+
+        if (hasNewRecoveryOnPage && emailElements.length > 0) {
+            hasOldRecoveryOnPage = true;
+            for (const emailEl of emailElements) {
+                let parent = emailEl.parentElement;
+                let rowContainer = null;
+                for (let depth = 0; depth < 5 && parent; depth++) {
+                    if (parent.classList.contains('box') || parent.classList.contains('pullout') || parent.tagName === 'BUTTON' || parent.getAttribute('role') === 'button') {
+                        rowContainer = parent;
+                        break;
+                    }
+                    parent = parent.parentElement;
+                }
+
+                if (rowContainer) {
+                    const deleteBtn = Array.from(rowContainer.querySelectorAll('*')).find(btn => {
+                        if (btn.children.length > 0) return false;
+                        const txt = (btn.textContent || btn.value || '').trim().toLowerCase();
+                        return btn.id === 'Remove' || txt === 'xÃ³a' || txt === 'remove';
+                    });
+
+                    if (deleteBtn && deleteBtn.offsetWidth > 0) {
+                        setDebug(`ðŸ—‘ï¸ Click nÃºt XÃ³a email cÅ©...`, '#e11d48');
+                        safeClick(deleteBtn);
+                        return;
+                    }
+
+                    const chevronBtn = rowContainer.querySelector('.ms-Icon--ChevronRight, [class*="ChevronRight"]');
+                    if (chevronBtn) {
+                        setDebug(`ðŸ”“ Click dáº¥u mÅ©i tÃªn Ä‘á»ƒ má»Ÿ rá»™ng email cÅ©...`, '#0284c7');
+                        safeClick(chevronBtn);
+                        return;
+                    }
+                }
+            }
+        }
+
+        if (hasNewRecoveryOnPage && !hasOldRecoveryOnPage) {
+            const changePassBtn = document.getElementById('ChangePassword');
+            if (changePassBtn && changePassBtn.offsetWidth > 0) {
+                setDebug(`ðŸ”‘ Click chá»n [Thay Ä‘á»•i máº­t kháº©u]...`, '#e11d48');
+                safeClick(changePassBtn);
+                return;
+            }
+
+            const passwordLink = Array.from(document.querySelectorAll('span.pullout-link-text, a, button, div')).find(el => {
+                const txt = (el.textContent || '').trim().toLowerCase();
+                return txt === 'nháº­p máº­t kháº©u' || txt === 'máº­t kháº©u' || txt === 'password' || txt.includes('nháº­p máº­t kháº©u') || txt.includes('thay Ä‘á»•i máº­t kháº©u');
+            });
+
+            if (passwordLink) {
+                let parent = passwordLink.parentElement;
+                let rowContainer = null;
+                for (let depth = 0; depth < 5 && parent; depth++) {
+                    if (parent.classList.contains('box') || parent.classList.contains('pullout') || parent.tagName === 'BUTTON' || parent.getAttribute('role') === 'button' || parent.classList.contains('ms-Grid-col')) {
+                        rowContainer = parent;
+                        break;
+                    }
+                    parent = parent.parentElement;
+                }
+
+                if (rowContainer) {
+                    const chevronBtn = rowContainer.querySelector('.ms-Icon--ChevronRight, [class*="ChevronRight"]');
+                    if (chevronBtn) {
+                        setDebug(`ðŸ”“ Click dáº¥u mÅ©i tÃªn Ä‘á»ƒ má»Ÿ rá»™ng má»¥c Máº­t kháº©u...`, '#0284c7');
+                        safeClick(chevronBtn);
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    function handleAccountOtp(acc, singleInput) {
+        const lastErrorTime = Number(sessionStorage.getItem("last_otp_error_time") || 0);
+        const secondsPassed = (Date.now() - lastErrorTime) / 1000;
+        if (secondsPassed < 35) {
+            const waitSeconds = Math.ceil(35 - secondsPassed);
+            setDebug(`â³ PhÃ¡t hiá»‡n nháº­p sai mÃ£. Táº¡m ngÆ°ng ${waitSeconds}s Ä‘á»ƒ chá» mÃ£ má»›i...`, '#d97706');
+            return;
+        }
+
+        const pageText = (document.body.innerText || '').toLowerCase();
+        let targetOtpEmail = acc.oldRecovery;
+
+        if (acc.recovery) {
+            const newRecLower = acc.recovery.toLowerCase();
+            const newPrefix = newRecLower.substring(0, 3);
+            const newDomain = newRecLower.split('@')[1] || '';
+            if (pageText.includes(newPrefix) && pageText.includes(newDomain)) {
+                targetOtpEmail = acc.recovery;
+            }
+        }
+
+        if (targetOtpEmail !== acc.recovery && acc.oldRecovery) {
+            const oldRecLower = acc.oldRecovery.toLowerCase();
+            const oldPrefix = oldRecLower.substring(0, 3);
+            const oldDomain = oldRecLower.split('@')[1] || '';
+            if (pageText.includes(oldPrefix) && pageText.includes(oldDomain)) {
+                targetOtpEmail = acc.oldRecovery;
+            }
+        }
+
+        setDebug(`â³ Äang cÃ o OTP trá»±c tiáº¿p tá»«: ${targetOtpEmail}...`, '#d97706');
+        fetchOtpFromInboxesOrSmv(targetOtpEmail, function(err, otp) {
+            if (otp) {
+                if (singleInput.value !== otp) {
+                    setDebug(`ðŸ” Äiá»n OTP cÃ o trá»±c tiáº¿p: ${otp}`, '#16a34a');
+                    safeFill(singleInput, otp);
+                    
+                    makeRequest(API_OTP_BRIDGE, "POST", { email: targetOtpEmail, otp: otp }, function() {});
+                    
+                    setTimeout(() => {
+                        const verifyBtn = document.querySelector('input[type="submit"], button[type="submit"], #idSIButton9, #submitBtn, #submitButton');
+                        if (verifyBtn) {
+                            safeClick(verifyBtn);
+                        }
+                    }, 500);
+                }
+            } else {
+                makeRequest(`${API_OTP_BRIDGE}?email=${encodeURIComponent(targetOtpEmail || '')}`, "GET", null, function(err, responseText) {
+                    if (err) return;
+                    try {
+                        const data = JSON.parse(responseText);
+                        if (data.success && data.otp) {
+                            if (singleInput.value !== data.otp) {
+                                setDebug(`ðŸ” Äiá»n OTP tá»« bridge: ${data.otp}`, '#16a34a');
+                                safeFill(singleInput, data.otp);
+                                setTimeout(() => {
+                                    const verifyBtn = document.querySelector('input[type="submit"], button[type="submit"], #idSIButton9, #submitBtn, #submitButton');
+                                    if (verifyBtn) {
+                                        safeClick(verifyBtn);
+                                    }
+                                }, 500);
+                            }
+                        }
+                    } catch (e) {}
+                });
+            }
+        });
+    }
+})();
+
+
+========================================================================
+  2. SCRIPT 2: SEELALLMAIL (TRANGCODE) OTP AUTO SCRAPER
+========================================================================
+// ==UserScript==
+// @name         Auto OTP Fetcher & Relayer for SellAllMail (Latest Sync 5.3)
+// @namespace    http://tampermonkey.net/
+// @version      5.3
+// @description  Tá»± Ä‘á»™ng quÃ©t mÃ£ OTP má»›i nháº¥t xuyÃªn qua cÃ¡c iframe cá»§a Trangcode vÃ  POST vá» local bridge (ÄÃ£ lá»c mÃ£ mÃ u 707070)
+// @author       Antigravity AI
+// @match        https://sellallmail.com/mailbox*
+// @grant        GM_xmlhttpRequest
+// @connect      127.0.0.1
+// @connect      localhost
+// @run-at       document-end
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // Táº¡o há»™p debug hiá»ƒn thá»‹ tráº¡ng thÃ¡i trÃªn trang Trangcode áº©n danh
+    const debugDiv = document.createElement('div');
+    debugDiv.style.position = 'fixed';
+    debugDiv.style.bottom = '10px';
+    debugDiv.style.right = '10px';
+    debugDiv.style.background = '#0284c7';
+    debugDiv.style.color = 'white';
+    debugDiv.style.padding = '10px 14px';
+    debugDiv.style.borderRadius = '8px';
+    debugDiv.style.zIndex = '999999';
+    debugDiv.style.fontSize = '12px';
+    debugDiv.style.fontFamily = 'monospace';
+    debugDiv.innerHTML = 'âš™ï¸ [Bridge] Äang dÃ² email...';
+    document.body.appendChild(debugDiv);
+
+    function getMailboxEmail() {
+        // CÃ¡ch 1: QuÃ©t input chá»©a email khÃ´i phá»¥c Ä‘ang má»Ÿ
+        const input = document.querySelector('input[value*="@"]');
+        if (input && input.value) return input.value.trim().toLowerCase();
+
+        // CÃ¡ch 2: TÃ¬m text cÃ³ chá»©a email khÃ´i phá»¥c
+        const matches = document.body.innerText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
+        if (matches) return matches[0].trim().toLowerCase();
+        return null;
+    }
+
+    function scrapeOtp() {
+        let plainText = document.body.innerText || '';
+
+        // QUÃ‰T XUYÃŠN IFRAME CÃ™NG NGUá»’N Gá»C
+        const iframes = document.querySelectorAll('iframe');
+        iframes.forEach(iframe => {
+            try {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                if (iframeDoc && iframeDoc.body) {
+                    plainText += ' ' + iframeDoc.body.innerText;
+                }
+            } catch (e) {
+                // Bá» qua lá»—i CORS náº¿u iframe khÃ¡c nguá»“n gá»‘c (thÃ´ng thÆ°á»ng Trangcode dÃ¹ng iframe cÃ¹ng domain)
+            }
+        });
+
+        // QuÃ©t tÃ¬m táº¥t cáº£ cÃ¡c sá»‘ cÃ³ Ä‘Ãºng 6 chá»¯ sá»‘ hiá»ƒn thá»‹ trÃªn vÄƒn báº£n thuáº§n gá»™p Ä‘Æ°á»£c
+        const matches = plainText.match(/\b\d{6}\b/g);
+        if (!matches) return null;
+
+        // Loáº¡i bá» sá»‘ 707070 (mÃ£ mÃ u CSS) Ä‘á»ƒ trÃ¡nh nháº­n nháº§m mÃ£ OTP
+        const cleanMatches = matches.filter(m => m !== '707070');
+        if (cleanMatches.length === 0) return null;
+
+        // Tráº£ vá» sá»‘ cuá»‘i cÃ¹ng xuáº¥t hiá»‡n trÃªn trang (tÆ°Æ¡ng á»©ng vá»›i thÆ° má»›i nháº¥t á»Ÿ cá»™t pháº£i)
+        return cleanMatches[cleanMatches.length - 1];
+    }
+
+    // VÃ²ng láº·p check vÃ  gá»­i OTP
+    setInterval(() => {
+        const email = getMailboxEmail();
+        if (!email) {
+            debugDiv.style.background = '#ef4444';
+            debugDiv.innerHTML = 'âš™ï¸ [Bridge] KhÃ´ng tÃ¬m tháº¥y email trÃªn giao diá»‡n!';
+            return;
+        }
+
+        const otp = scrapeOtp();
+        if (!otp) {
+            debugDiv.style.background = '#eab308';
+            debugDiv.innerHTML = `âš™ï¸ [Bridge] Mail: ${email}<br>â³ ChÆ°a phÃ¡t hiá»‡n sá»‘ OTP 6 chá»¯ sá»‘ nÃ o...`;
+            return;
+        }
+
+        debugDiv.style.background = '#22c55e';
+        debugDiv.innerHTML = `âš™ï¸ [Bridge] Mail: ${email}<br>ðŸ” PhÃ¡t hiá»‡n OTP: ${otp}<br>ðŸš€ Äang Ä‘á»“ng bá»™...`;
+
+        // Gá»­i OTP vá» local API Bridge cá»§a Tool
+        GM_xmlhttpRequest({
+            method: 'POST',
+            url: 'http://127.0.0.1:3000/api/otp-bridge',
+            headers: { 'Content-Type': 'application/json' },
+            data: JSON.stringify({ email: email, otp: otp }),
+            onload: function(res) {
+                debugDiv.innerHTML = `âš™ï¸ [Bridge] Mail: ${email}<br>âœ… ÄÃ£ Ä‘á»“ng bá»™ OTP: ${otp}`;
+                console.log('[Bridge] Gá»­i OTP thÃ nh cÃ´ng vá» Tool:', email, otp);
+            },
+            onerror: function(err) {
+                debugDiv.style.background = '#ef4444';
+                debugDiv.innerHTML = `âš™ï¸ [Bridge] Mail: ${email}<br>âŒ Lá»—i káº¿t ná»‘i Bridge local!`;
+                console.error('[Bridge] Gá»­i OTP tháº¥t báº¡i:', err);
+            }
+        });
+    }, 2000); // 2 giÃ¢y quÃ©t 1 láº§n Ä‘á»ƒ nháº¡y bÃ©n tá»‘i Ä‘a
+})();
+
+
+========================================================================
+  3. SCRIPT 3: CAPITAL ONE SHOPPING AUTO LOGIN & CHANGE PASSWORD
+========================================================================
+// ==UserScript==
+// @name         Capital One Shopping Auto Login & Change Password (API Sync)
+// @namespace    http://tampermonkey.net/
+// @version      1.1
+// @description  Tu dong dang nhap bang email + MK Capital cu, tu dong doi MK, hoac tu dong check dang nhap
+// @author       Antigravity AI
+// @match        https://*.capitaloneshopping.com/*
+// @match        https://capitaloneshopping.com/*
+// @grant        GM_xmlhttpRequest
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @connect      127.0.0.1
+// @connect      localhost
+// @run-at       document-end
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    let debugDiv = null;
+    let isClickingDiffWay = false;
+    let isReported = false;
+
+    function initDebug() {
+        if (debugDiv) return;
+        debugDiv = document.createElement('div');
+        debugDiv.style.position = 'fixed';
+        debugDiv.style.top = '10px';
+        debugDiv.style.right = '10px';
+        debugDiv.style.background = '#0f172a';
+        debugDiv.style.color = 'white';
+        debugDiv.style.padding = '12px 16px';
+        debugDiv.style.borderRadius = '8px';
+        debugDiv.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';
+        debugDiv.style.zIndex = '9999999';
+        debugDiv.style.fontSize = '13px';
+        debugDiv.style.fontFamily = 'monospace';
+        debugDiv.style.lineHeight = '1.5';
+        debugDiv.style.maxWidth = '400px';
+        debugDiv.style.wordBreak = 'break-all';
+        debugDiv.innerHTML = '[Capital One Shopping] Dang khoi dong...';
+        document.body.appendChild(debugDiv);
+    }
+
+    function setDebug(msg, color = '#0f172a') {
+        if (!debugDiv) initDebug();
+        debugDiv.style.background = color;
+        debugDiv.innerHTML = '[Capital One Shopping]<br>' + msg;
+    }
+
+    const API_CURRENT_ACCOUNT = 'http://127.0.0.1:3000/api/current-account';
+    const API_REPORT_RESULT = 'http://127.0.0.1:3000/api/check-capital/report';
+
+    function safeFill(element, value) {
+        if (!element) return false;
+        try {
+            element.focus();
+            const prototype = Object.getPrototypeOf(element);
+            const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+            
+            if (descriptor && descriptor.set) {
+                descriptor.set.call(element, value);
+            } else {
+                element.value = value;
+            }
+            
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+            element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: value }));
+            element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: value }));
+        } catch (e) {
+            console.error('[Tampermonkey] Loi safeFill:', e);
+            element.value = value;
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        return true;
+    }
+
+    function safeClick(element) {
+        if (!element) return false;
+        try {
+            element.focus();
+            const clickEvent = new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true,
+                view: window
+            });
+            element.dispatchEvent(clickEvent);
+            if (typeof element.click === 'function') {
+                element.click();
+            }
+        } catch (e) {
+            console.error('[Tampermonkey] Lá»—i safeClick:', e);
+            try { element.click(); } catch(err) {}
+        }
+        return true;
+    }
+
+    function makeRequest(url, method, data, callback) {
+        if (typeof GM_xmlhttpRequest !== 'undefined') {
+            GM_xmlhttpRequest({
+                method: method,
+                url: url,
+                headers: { "Content-Type": "application/json" },
+                data: data ? JSON.stringify(data) : null,
+                onload: function(res) { callback(null, res.responseText); },
+                onerror: function(err) {
+                    fetch(url, {
+                        method: method,
+                        headers: data ? { "Content-Type": "application/json" } : {},
+                        body: data ? JSON.stringify(data) : null
+                    })
+                    .then(r => r.text())
+                    .then(text => callback(null, text))
+                    .catch(e => callback(e, null));
+                }
+            });
+        } else {
+            fetch(url, {
+                method: method,
+                headers: data ? { "Content-Type": "application/json" } : {},
+                body: data ? JSON.stringify(data) : null
+            })
+            .then(r => r.text())
+            .then(text => callback(null, text))
+            .catch(e => callback(e, null));
+        }
+    }
+
+    function reportResult(acc, status, errorMsg = '') {
+        if (isReported) return;
+        isReported = true;
+
+        const body = {
+            sheetId: acc.sheetId,
+            sheetName: acc.sheetName,
+            rowIndex: acc.rowIndex,
+            email: acc.email,
+            status: status,
+            error: errorMsg
+        };
+
+        setDebug(`Gui ket qua check: [${status.toUpperCase()}]...`, status === 'ok' ? '#16a34a' : '#be123c');
+
+        makeRequest(API_REPORT_RESULT, "POST", body, function(err) {
+            if (err) {
+                console.error('[Script 3] Loi gui bao cao:', err);
+            }
+            // Tu dong dong tab sau khi gui bao cao thanh cong
+            setTimeout(() => {
+                window.close();
+            }, 1000);
+        });
+    }
+
+    function checkURLHash() {
+        const hash = window.location.hash;
+        if (hash.startsWith('#check=')) {
+            try {
+                const base64Data = hash.substring(7);
+                const decodedData = decodeURIComponent(escape(atob(base64Data)));
+                return JSON.parse(decodedData);
+            } catch (e) {
+                console.error('[Script 3] Loi parse hash check:', e);
+            }
+        }
+        return null;
+    }
+
+    function initialize() {
+        initDebug();
+        
+        // 1. Kiem tra xem co phai dang o luong tu dong check khong
+        const checkAcc = checkURLHash();
+        if (checkAcc) {
+            setDebug(`Luong CHECK tu dong!<br>Acc: ${checkAcc.email}`, '#6366f1');
+            
+            // Loop de tu dong check
+            const checkInterval = setInterval(() => {
+                runStep(checkAcc, checkInterval, true);
+            }, 1500);
+            return;
+        }
+
+        // 2. Neu khong phai luong check thi chay luong doi mat khau dong bo binh thuong
+        setTimeout(() => {
+            const interval = setInterval(() => {
+                try {
+                    makeRequest(API_CURRENT_ACCOUNT, "GET", null, function(err, responseText) {
+                        if (err) {
+                            setDebug('Khong ket noi duoc voi Tool local de dong bo...', '#be123c');
+                            return;
+                        }
+                        try {
+                            const resData = JSON.parse(responseText);
+                            if (resData.success && resData.account) {
+                                const acc = resData.account;
+                                setDebug(`Dong bo OK!<br>Acc dang xu ly: ${acc.email}`, '#16a34a');
+                                runStep(acc, interval, false);
+                            } else {
+                                setDebug('Vui long click [Vao Capital] tren giao dien Tool de truyen thong tin...');
+                            }
+                        } catch (e) {
+                            console.error('Loi parse config:', e);
+                        }
+                    });
+                } catch (e) {
+                    setDebug('Loi vong lap: ' + e.message, '#be123c');
+                }
+            }, 1000);
+        }, 1000);
+    }
+
+    if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', initialize);
+    } else {
+        initialize();
+    }
+
+    function runStep(acc, interval, isAutoCheck = false) {
+        const path = window.location.pathname;
+        const host = window.location.host;
+
+        // Kiem tra loi dang nhap truoc
+        const bodyText = (document.body.innerText || '').toLowerCase();
+        const isWrongCredsText = bodyText.includes('incorrect') || 
+                                 bodyText.includes("don't recognize") ||
+                                 bodyText.includes("invalid") ||
+                                 bodyText.includes("wrong email") ||
+                                 bodyText.includes("incorrect password");
+
+        if (isAutoCheck && isWrongCredsText) {
+            clearInterval(interval);
+            reportResult(acc, 'error', 'Sai tai khoan hoac mat khau Capital One');
+            return;
+        }
+
+        const isLoginPage = path.includes('/auth/signin') || 
+                            path.includes('/sign-in') || 
+                            path.includes('/login') || 
+                            document.getElementById('id_email') !== null ||
+                            document.querySelector('input[type="email"]') !== null ||
+                            Array.from(document.querySelectorAll('button, a, span')).some(el => (el.textContent || '').toLowerCase().includes('sign in a different way'));
+
+        if (isLoginPage) {
+            // Tim cac input dang hien thi tren man hinh
+            const emailInput = Array.from(document.querySelectorAll('input[type="email"], input[id*="email"], input[name*="email"]'))
+                                    .find(el => el.offsetWidth > 0 && el.offsetHeight > 0) ||
+                               document.querySelector('input[type="email"]');
+
+            const passInput = Array.from(document.querySelectorAll('input[type="password"], input[id*="password"], input[name*="password"]'))
+                                   .find(el => el.offsetWidth > 0 && el.offsetHeight > 0) ||
+                              document.querySelector('input[type="password"]');
+
+            if (!passInput || passInput.offsetWidth === 0) {
+                if (isClickingDiffWay) return;
+                
+                const diffWayBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                    const txt = (btn.textContent || '').trim().toLowerCase();
+                    return btn.classList.contains('sign-in-secondary-link') || txt.includes('sign in a different way');
+                });
+                
+                if (diffWayBtn && diffWayBtn.offsetWidth > 0) {
+                    setDebug('Click [Sign in a different way]...', '#0284c7');
+                    isClickingDiffWay = true;
+                    safeClick(diffWayBtn);
+                    setTimeout(() => { isClickingDiffWay = false; }, 4000);
+                    return;
+                }
+            }
+
+            if (emailInput && emailInput.offsetWidth > 0) {
+                if (emailInput.value !== acc.email) {
+                    setDebug(`Dang dien Email: ${acc.email}`, '#0284c7');
+                    safeFill(emailInput, acc.email);
+                }
+            }
+
+            if (passInput && passInput.offsetWidth > 0 && acc.mkCapital) {
+                if (passInput.value !== acc.mkCapital) {
+                    setDebug('Dang dien Mat khau Capital cu...', '#0284c7');
+                    safeFill(passInput, acc.mkCapital);
+                }
+            }
+
+            let loginBtn = document.querySelector('button[type="submit"].sign-in-primary-btn') || 
+                           document.querySelector('button[type="submit"]');
+            
+            if (!loginBtn) {
+                loginBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                    const txt = (btn.textContent || '').trim().toLowerCase();
+                    return btn.offsetWidth > 0 && (txt === 'sign in' || (txt.includes('sign in') && !txt.includes('link') && !txt.includes('different') && !txt.includes('way')));
+                });
+            }
+
+            if (loginBtn && emailInput && emailInput.value.length > 0 && (passInput ? passInput.value.length > 0 : true)) {
+                setDebug('Click [Sign In/Continue]...', '#16a34a');
+                safeClick(loginBtn);
+                return;
+            }
+            return;
+        }
+
+        // Kiem tra trang thai dang nhap thanh cong
+        const hasUserMenu = document.querySelector('[data-testid="account-nav-menu"]') || 
+                            document.getElementById('radix-_r_0_') || 
+                            Array.from(document.querySelectorAll('button')).some(btn => {
+                                return btn.getAttribute('aria-haspopup') === 'menu' || btn.getAttribute('aria-expanded') !== null;
+                            });
+
+        if (hasUserMenu || (path !== '/sign-in' && !path.includes('/sign-in') && !path.includes('/auth/signin'))) {
+            clearInterval(interval);
+            if (isAutoCheck) {
+                // Neu dang o luong check tu dong, bao cao ket qua OK va dong tab
+                reportResult(acc, 'ok');
+            } else {
+                setDebug('Dang nhap thanh cong! Dang chuyen huong sang trang Profile...', '#16a34a');
+                window.location.href = 'https://capitaloneshopping.com/account-settings/profile';
+            }
+            return;
+        }
+
+        const signInLink = Array.from(document.querySelectorAll('a, button')).find(el => {
+            const txt = (el.textContent || '').trim().toLowerCase();
+            const href = el.getAttribute('href') || '';
+            const isClassSignIn = el.className && typeof el.className === 'string' && el.className.toLowerCase().includes('signin');
+            return el.offsetWidth > 0 && (href === '/sign-in' || txt === 'sign in' || isClassSignIn);
+        });
+
+        if (signInLink && signInLink.offsetWidth > 0) {
+            setDebug('Click chuyen huong den trang [Sign In]...', '#0284c7');
+            safeClick(signInLink);
+            return;
+        }
+    }
+})();
+
+
+========================================================================
+  4. SCRIPT 4: INBOXES & SMVMAIL OTP AUTO SCRAPER & BRIDGE
+========================================================================
+// ==UserScript==
+// @name         Inboxes & SMVmail OTP Auto Scraper & Bridge
+// @namespace    http://tampermonkey.net/
+// @version      1.1
+// @description  Tu dong Add Inbox tren inboxes.com va cao OTP gui ve local bridge
+// @author       Antigravity AI
+// @match        https://inboxes.com/*
+// @match        https://smvmail.com/email/*
+// @grant        GM_xmlhttpRequest
+// @connect      127.0.0.1
+// @connect      localhost
+// @connect      inboxes.com
+// @connect      smvmail.com
+// @run-at       document-end
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    const API_OTP_BRIDGE = 'http://127.0.0.1:3000/api/otp-bridge';
+    const API_CURRENT_ACCOUNT = 'http://127.0.0.1:3000/api/current-account';
+
+    // Bang debug trang thai
+    const debugDiv = document.createElement('div');
+    debugDiv.style.position = 'fixed';
+    debugDiv.style.bottom = '10px';
+    debugDiv.style.right = '10px';
+    debugDiv.style.background = '#0f172a';
+    debugDiv.style.color = 'white';
+    debugDiv.style.padding = '12px 16px';
+    debugDiv.style.borderRadius = '8px';
+    debugDiv.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';
+    debugDiv.style.zIndex = '9999999';
+    debugDiv.style.fontSize = '12px';
+    debugDiv.style.fontFamily = 'monospace';
+    debugDiv.innerHTML = '[Bridge] Dang khoi dong...';
+    document.body.appendChild(debugDiv);
+
+    function setDebug(msg, color = '#0f172a') {
+        debugDiv.style.background = color;
+        debugDiv.innerHTML = '[Bridge]<br>' + msg;
+    }
+
+    let isAddingInbox = false;
+
+    function safeFill(element, value) {
+        if (!element) return false;
+        try {
+            element.focus();
+            const prototype = Object.getPrototypeOf(element);
+            const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+            if (descriptor && descriptor.set) {
+                descriptor.set.call(element, value);
+            } else {
+                element.value = value;
+            }
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+        } catch (e) {
+            element.value = value;
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        return true;
+    }
+
+    function safeClick(element) {
+        if (!element) return false;
+        try {
+            element.focus();
+            
+            // 1. Thu goi truc tiep React Event Handlers (Bypass React Aria & isTrusted)
+            const reactPropsKey = Object.keys(element).find(key => 
+                key.startsWith('__reactProps$') || 
+                key.startsWith('__reactEventHandlers$') || 
+                key.startsWith('__reactInternalInstance$')
+            );
+            if (reactPropsKey && element[reactPropsKey]) {
+                const props = element[reactPropsKey];
+                if (typeof props.onClick === 'function') {
+                    try { props.onClick({ preventDefault: () => {}, stopPropagation: () => {}, target: element, currentTarget: element }); } catch(e) {}
+                }
+                if (typeof props.onPointerDown === 'function') {
+                    try { props.onPointerDown({ preventDefault: () => {}, stopPropagation: () => {}, target: element, currentTarget: element }); } catch(e) {}
+                }
+                if (typeof props.onPress === 'function') {
+                    try { props.onPress({ preventDefault: () => {}, stopPropagation: () => {}, target: element, currentTarget: element }); } catch(e) {}
+                }
+            }
+
+            // 2. Dispatch PointerEvents & MouseEvents voi day du thuoc tinh va do tre cho React Aria
+            const rect = element.getBoundingClientRect();
+            const x = rect.left + rect.width / 2 + (Math.random() * 4 - 2);
+            const y = rect.top + rect.height / 2 + (Math.random() * 4 - 2);
+            
+            const eventOpts = {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                clientX: x,
+                clientY: y,
+                screenX: x + (window.screenLeft || window.screenX || 0),
+                screenY: y + (window.screenTop || window.screenY || 0),
+                button: 0,
+                buttons: 1
+            };
+
+            const pointerOpts = Object.assign({}, eventOpts, {
+                pointerId: 1,
+                pointerType: 'mouse',
+                width: 1,
+                height: 1,
+                pressure: 0.5,
+                isPrimary: true
+            });
+            
+            // Gui Down events
+            element.dispatchEvent(new PointerEvent('pointerdown', pointerOpts));
+            element.dispatchEvent(new MouseEvent('mousedown', eventOpts));
+            
+            if (typeof element.focus === 'function') {
+                element.focus();
+            }
+            
+            // Tri hoan 50ms de mo phong cu click chuot that (React Aria yeu cau do tre pointerdown -> pointerup)
+            setTimeout(() => {
+                element.dispatchEvent(new PointerEvent('pointerup', pointerOpts));
+                element.dispatchEvent(new MouseEvent('mouseup', eventOpts));
+                
+                const clickEv = new MouseEvent('click', eventOpts);
+                element.dispatchEvent(clickEv);
+                
+                // Dispatch Enter & Space key events
+                element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13 }));
+                element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13 }));
+                element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: ' ', code: 'Space', keyCode: 32 }));
+                element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: ' ', code: 'Space', keyCode: 32 }));
+                
+                if (typeof element.click === 'function') {
+                    element.click();
+                }
+            }, 50);
+        } catch (e) {
+            console.error('[Tampermonkey] Loi safeClick:', e);
+            try { element.click(); } catch(err) {}
+        }
+        return true;
+    }
+
+    function makeRequest(url, method, data, callback) {
+        if (typeof GM_xmlhttpRequest !== 'undefined') {
+            GM_xmlhttpRequest({
+                method: method,
+                url: url,
+                headers: { "Content-Type": "application/json" },
+                data: data ? JSON.stringify(data) : null,
+                onload: function(res) { callback(null, res.responseText); },
+                onerror: function(err) { callback(err, null); }
+            });
+        }
+    }
+
+    function extractOtpFromHtml(html, text) {
+        if (text) {
+            const matches = text.match(/\b\d{6}\b/g);
+            if (matches) {
+                const otp = matches.find(m => m !== '707070');
+                if (otp) return otp;
+            }
+        }
+        let cleaned = html || '';
+        cleaned = cleaned.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+        cleaned = cleaned.replace(/style="[^"]*"/gi, '');
+        cleaned = cleaned.replace(/style='[^']*'/gi, '');
+        cleaned = cleaned.replace(/<[^>]+>/g, ' ');
+        const matchesCleaned = cleaned.match(/\b\d{6}\b/g);
+        if (matchesCleaned) {
+            const otp = matchesCleaned.find(m => m !== '707070');
+            return otp || matchesCleaned[0];
+        }
+        return null;
+    }
+
+    function scrapOtpFromDOM() {
+        const pageText = document.body.innerText || '';
+        const matches = pageText.match(/\b\d{6}\b/g);
+        if (matches) {
+            const otp = matches.find(m => m !== '707070');
+            if (otp) {
+                const lowerText = pageText.toLowerCase();
+                const isMicrosoft = lowerText.includes('microsoft') || lowerText.includes('ma bao mat') || lowerText.includes('security code');
+                if (isMicrosoft) {
+                    return otp;
+                }
+            }
+        }
+        return null;
+    }
+
+    function handleAutoAddInbox(email) {
+        if (isAddingInbox) return;
+        const parts = email.split('@');
+        const username = parts[0];
+        const domain = parts[1];
+        if (!username || !domain) return;
+
+        // 0. CHECK VA XOA HOM THU CU TRUOC KHI ADD HOM THU MOI
+        const deleteBtn = Array.from(document.querySelectorAll('button, a, span')).find(btn => {
+            const txt = (btn.textContent || '').trim().toLowerCase();
+            return btn.offsetWidth > 0 && txt.includes('delete inbox');
+        });
+
+        if (deleteBtn && deleteBtn.offsetWidth > 0) {
+            setDebug('Phat hien hom thu cu. Dang click [Delete Inbox]...', '#be123c');
+            const targetBtn = deleteBtn.closest('button, a, [role="button"]') || deleteBtn;
+            safeClick(targetBtn);
+            
+            // Tim nut xac nhan xoa trong popup sau 400ms
+            setTimeout(() => {
+                const confirmDeleteBtn = Array.from(document.querySelectorAll('button, a, span')).find(btn => {
+                    const txt = (btn.textContent || '').trim().toLowerCase();
+                    return btn.offsetWidth > 0 && (txt === 'delete' || txt === 'yes' || txt.includes('confirm') || btn.classList.contains('bg-red-600') || btn.className.includes('bg-red'));
+                });
+                if (confirmDeleteBtn) {
+                    setDebug('Click xac nhan xoa hom thu cu...', '#be123c');
+                    const targetConfirm = confirmDeleteBtn.closest('button, a, [role="button"]') || confirmDeleteBtn;
+                    safeClick(targetConfirm);
+                }
+            }, 400);
+            return; // Dung lai de cho hom thu duoc xoa
+        }
+
+        // 1. Kiem tra xem popup "Add Inbox" da hien thi chua
+        const usernameInput = document.querySelector('input[placeholder*="username"]') || 
+                              document.querySelector('input[placeholder*="Username"]') ||
+                              Array.from(document.querySelectorAll('input')).find(input => {
+                                  const ph = (input.placeholder || '').toLowerCase();
+                                  return ph.includes('username') || ph.includes('name') || input.id === 'username';
+                              });
+
+        if (usernameInput && usernameInput.offsetWidth > 0) {
+            // Popup dang mo -> Tien hanh dien va chon
+            
+            // A. Dien username
+            if (usernameInput.value !== username) {
+                setDebug(`Dien username: ${username}`, '#0284c7');
+                safeFill(usernameInput, username);
+                return;
+            }
+
+            // B. Chon domain
+            // Cach 1: Thu tim va doi gia tri qua the select truyen thong neu co
+            const nativeSelect = document.querySelector('select');
+            let isDomainMatched = false;
+
+            if (nativeSelect && nativeSelect.offsetWidth > 0) {
+                const targetOption = Array.from(nativeSelect.options).find(opt => {
+                    const txt = (opt.text || opt.value || '').toLowerCase();
+                    return txt.includes(domain);
+                });
+                if (targetOption) {
+                    if (nativeSelect.value !== targetOption.value) {
+                        setDebug(`Dien domain (native select): ${domain}`, '#0284c7');
+                        nativeSelect.value = targetOption.value;
+                        nativeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                        nativeSelect.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    isDomainMatched = true;
+                }
+            }
+
+            // Cach 2: Tim va click Custom Select Dropdown
+            let selectBtn = null;
+            if (!isDomainMatched) {
+                selectBtn = document.querySelector('button[id*="domain"]') || 
+                            Array.from(document.querySelectorAll('button, div, span, p, label')).find(el => {
+                                const txt = (el.textContent || '').trim().toLowerCase();
+                                const isSuffix = txt.endsWith('.com') || txt.endsWith('.work') || txt.endsWith('.info') || txt.includes('.com') || txt.includes('.work') || txt.includes('.info');
+                                return el.offsetWidth > 0 && isSuffix && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA';
+                            });
+
+                if (selectBtn) {
+                    const currentSelected = (selectBtn.textContent || '').trim().toLowerCase();
+                    if (currentSelected.includes(domain)) {
+                        isDomainMatched = true;
+                    } else {
+                        // Thu quet xem dropdown option co hien thi tren man hinh khong
+                        const optionEl = Array.from(document.querySelectorAll('div, li, span, a, p')).find(el => {
+                            const txt = (el.textContent || '').trim().toLowerCase();
+                            return el.offsetWidth > 0 && (txt === domain || txt === '@' + domain || txt === '.' + domain || txt.includes(domain));
+                        });
+
+                        if (optionEl) {
+                            setDebug(`Chon domain: ${domain}`, '#0284c7');
+                            const targetBtn = optionEl.closest('button, a, [role="button"], div, li') || optionEl;
+                            safeClick(targetBtn);
+                        } else {
+                            setDebug(`Click mo dropdown domain...`, '#0284c7');
+                            const targetBtn = selectBtn.closest('button, a, [role="button"], [role="combobox"]') || selectBtn;
+                            safeClick(targetBtn);
+                        }
+                        return; // Dang chon domain -> return cho
+                    }
+                }
+            }
+
+            // C. Click Add Inbox xac nhan trong popup (Chi khi username da dung VA domain da dung!)
+            if (usernameInput.value === username && isDomainMatched) {
+                const confirmBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                    const txt = (btn.textContent || '').trim().toLowerCase();
+                    const hasColor = btn.className.includes('bg-primary') || btn.className.includes('bg-blue') || btn.className.includes('bg-indigo') || btn.className.includes('text-white') || btn.className.includes('bg-indigo-600');
+                    return txt === 'add inbox' && hasColor;
+                });
+
+                if (confirmBtn && confirmBtn.offsetWidth > 0) {
+                    setDebug(`Click Add Inbox tao hom thu...`, '#16a34a');
+                    isAddingInbox = true;
+                    const targetBtn = confirmBtn.closest('button, a, [role="button"]') || confirmBtn;
+                    safeClick(targetBtn);
+                    setTimeout(() => { isAddingInbox = false; }, 3000);
+                }
+            }
+        } else {
+            // Kiem tra xem co nut "Get my first inbox!" cua trang chu khong
+            const getFirstInboxBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                const txt = (btn.textContent || '').trim().toLowerCase();
+                return txt.includes('get my first inbox');
+            });
+
+            if (getFirstInboxBtn && getFirstInboxBtn.offsetWidth > 0) {
+                setDebug(`Click [Get my first inbox]...`, '#0284c7');
+                safeClick(getFirstInboxBtn);
+                return;
+            }
+
+            // Popup chua mo -> Tim click nut "Add Inbox" o trang chinh
+            const openPopupBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                const txt = (btn.textContent || '').trim().toLowerCase();
+                return txt === 'add inbox' && btn.className.includes('bg-indigo-600');
+            });
+
+            if (openPopupBtn && openPopupBtn.offsetWidth > 0) {
+                setDebug(`Click [Add Inbox] mo popup...`, '#0284c7');
+                safeClick(openPopupBtn);
+            }
+        }
+    }
+
+    function fetchAndPostOtp(email) {
+        const host = window.location.host.toLowerCase();
+        if (host.includes('smvmail.com')) {
+            const url = `https://smvmail.com/api/email?page=1&q=&email=${encodeURIComponent(email)}&_t=${Date.now()}`;
+            makeRequest(url, "GET", null, function(err, responseText) {
+                if (err) return;
+                try {
+                    const json = JSON.parse(responseText);
+                    const docs = json.data?.docs || json.data?.data?.docs || json.docs || [];
+                    for (const doc of docs) {
+                        const subject = (doc.subject || '').toLowerCase();
+                        if (subject.includes('microsoft') || (doc.text && doc.text.toLowerCase().includes('microsoft')) || (doc.html && doc.html.toLowerCase().includes('microsoft'))) {
+                            const otp = extractOtpFromHtml(doc.html, doc.text);
+                            if (otp) {
+                                setDebug(`Phat hien OTP SMVmail: ${otp}`, '#22c55e');
+                                makeRequest(API_OTP_BRIDGE, "POST", { email: email, otp: otp }, function() {});
+                                break;
+                            }
+                        }
+                    }
+                } catch(e) {}
+            });
+        } else if (host.includes('inboxes.com')) {
+            const listUrl = `https://inboxes.com/api/v2/inbox/${encodeURIComponent(email)}?_t=${Date.now()}`;
+            makeRequest(listUrl, "GET", null, function(err, responseText) {
+                if (err) return;
+                try {
+                    const data = JSON.parse(responseText);
+                    const messages = data.msgs || [];
+                    const targetMsg = messages.find(msg => msg.f && msg.f.toLowerCase().includes('microsoft'));
+                    if (targetMsg) {
+                        const bodyUrl = `https://inboxes.com/api/v2/message/${encodeURIComponent(targetMsg.uid)}`;
+                        makeRequest(bodyUrl, "GET", null, function(err, bodyResponseText) {
+                            if (err) return;
+                            try {
+                                const bodyData = JSON.parse(bodyResponseText);
+                                const otp = extractOtpFromHtml(bodyData.html, bodyData.text);
+                                if (otp) {
+                                    setDebug(`Phat hien OTP Inboxes: ${otp}`, '#22c55e');
+                                    makeRequest(API_OTP_BRIDGE, "POST", { email: email, otp: otp }, function() {});
+                                }
+                            } catch(e) {}
+                        });
+                    } else {
+                        setDebug(`Dang doi OTP Microsoft gui ve: ${email}...`, '#eab308');
+                    }
+                } catch(e) {}
+            });
+        }
+    }
+
+    // Vong lap chinh dong bo va chay
+    setInterval(() => {
+        makeRequest(API_CURRENT_ACCOUNT, "GET", null, function(err, responseText) {
+            if (err) {
+                setDebug('Loi dong bo Tool local...', '#ef4444');
+                return;
+            }
+            try {
+                const resData = JSON.parse(responseText);
+                const account = resData?.account;
+                const recoveryEmail = account?.recovery || account?.newRecovery;
+                if (resData.success && account && recoveryEmail) {
+                    const email = recoveryEmail.toLowerCase().trim();
+                    const pageText = (document.body.innerText || '').toLowerCase();
+                    const isMailboxActive = pageText.includes(email);
+
+                    // 1. Uu tien cao OTP truc tiep tu DOM neu nguoi dung dang mo trang doc thu
+                    const domOtp = scrapOtpFromDOM();
+                    if (domOtp) {
+                        setDebug(`Phat hien OTP tu man hinh: ${domOtp}`, '#22c55e');
+                        makeRequest(API_OTP_BRIDGE, "POST", { email: email, otp: domOtp }, function() {});
+                        return;
+                    }
+
+                    // 2. Kiem tra va tu dong click mo email Microsoft neu dang o trang danh sach
+                    if (window.location.host.includes('inboxes.com') && isMailboxActive) {
+                        const emailRow = Array.from(document.querySelectorAll('div, span, p, a, h1, h2, h3, h4, h5, h6')).find(el => {
+                            const txt = (el.textContent || '').trim().toLowerCase();
+                            // Chá»‰ cáº§n email chá»©a tá»« khÃ³a microsoft (khÃ´ng dáº¥u nÃªn 100% khá»›p) vÃ  loáº¡i trá»« script/style
+                            const isMicrosoftEmail = txt.includes('microsoft') && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE';
+                            return el.offsetWidth > 0 && isMicrosoftEmail && !el.closest('header') && !el.closest('footer') && !el.closest('.loading') && !el.closest('#footer-note');
+                        });
+
+                        if (emailRow) {
+                            const isReadingPage = window.location.pathname.includes('/read/');
+                            if (!isReadingPage) {
+                                setDebug('Phat hien thu Microsoft trong danh sach. Dang mo thu...', '#0284c7');
+                                // TiÌ€m theÌ‰ click tr: HÃ ng báº£ng chá»©a dÃ²ng thÆ°, hoáº·c td, hoáº·c div bá»c ngoÃ i, hoáº·c a
+                                const targetBtn = emailRow.closest('tr') || emailRow.closest('td') || emailRow.closest('a') || emailRow;
+                                safeClick(targetBtn);
+                                return; // Cho trang doc thu load
+                            }
+                        }
+                    }
+
+                    // 3. Chay luong tao hom thu hoac check API ngam
+                    if (window.location.host.includes('inboxes.com') && !isMailboxActive) {
+                        handleAutoAddInbox(email);
+                    } else {
+                        fetchAndPostOtp(email);
+                    }
+                } else {
+                    setDebug('Cho thong tin email khoi phuc moi tu Tool...', '#eab308');
+                }
+            } catch(e) {
+                console.error(e);
+            }
+        });
+    }, 2000);
+})();
+
+
