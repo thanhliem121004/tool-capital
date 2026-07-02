@@ -57,13 +57,13 @@
             element.focus();
             const prototype = Object.getPrototypeOf(element);
             const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
-            
+
             if (descriptor && descriptor.set) {
                 descriptor.set.call(element, value);
             } else {
                 element.value = value;
             }
-            
+
             element.dispatchEvent(new Event('input', { bubbles: true }));
             element.dispatchEvent(new Event('change', { bubbles: true }));
             element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: value }));
@@ -170,12 +170,12 @@
 
     function initialize() {
         initDebug();
-        
+
         // 1. Kiem tra xem co phai dang o luong tu dong check khong
         const checkAcc = checkURLHash();
         if (checkAcc) {
             setDebug(`Luong CHECK tu dong!<br>Acc: ${checkAcc.email}`, '#6366f1');
-            
+
             // Loop de tu dong check
             const checkInterval = setInterval(() => {
                 runStep(checkAcc, checkInterval, true);
@@ -224,11 +224,12 @@
 
         // Kiem tra loi dang nhap truoc
         const bodyText = (document.body.innerText || '').toLowerCase();
-        const isWrongCredsText = bodyText.includes('incorrect') || 
-                                 bodyText.includes("don't recognize") ||
-                                 bodyText.includes("invalid") ||
-                                 bodyText.includes("wrong email") ||
-                                 bodyText.includes("incorrect password");
+        const isWrongCredsText = bodyText.includes('incorrect email or password') || 
+                                 bodyText.includes("don't recognize that email or password") ||
+                                 bodyText.includes("incorrect password") ||
+                                 (bodyText.includes("don't recognize") && (bodyText.includes("email") || bodyText.includes("password"))) ||
+                                 bodyText.includes("wrong email or password") ||
+                                 (bodyText.includes("invalid") && bodyText.includes("password"));
 
         if (isAutoCheck && isWrongCredsText) {
             clearInterval(interval);
@@ -236,9 +237,9 @@
             return;
         }
 
-        const isLoginPage = path.includes('/auth/signin') || 
-                            path.includes('/sign-in') || 
-                            path.includes('/login') || 
+        const isLoginPage = path.includes('/auth/signin') ||
+                            path.includes('/sign-in') ||
+                            path.includes('/login') ||
                             document.getElementById('id_email') !== null ||
                             document.querySelector('input[type="email"]') !== null ||
                             Array.from(document.querySelectorAll('button, a, span')).some(el => (el.textContent || '').toLowerCase().includes('sign in a different way'));
@@ -255,12 +256,12 @@
 
             if (!passInput || passInput.offsetWidth === 0) {
                 if (isClickingDiffWay) return;
-                
+
                 const diffWayBtn = Array.from(document.querySelectorAll('button')).find(btn => {
                     const txt = (btn.textContent || '').trim().toLowerCase();
                     return btn.classList.contains('sign-in-secondary-link') || txt.includes('sign in a different way');
                 });
-                
+
                 if (diffWayBtn && diffWayBtn.offsetWidth > 0) {
                     setDebug('Click [Sign in a different way]...', '#0284c7');
                     isClickingDiffWay = true;
@@ -284,9 +285,9 @@
                 }
             }
 
-            let loginBtn = document.querySelector('button[type="submit"].sign-in-primary-btn') || 
+            let loginBtn = document.querySelector('button[type="submit"].sign-in-primary-btn') ||
                            document.querySelector('button[type="submit"]');
-            
+
             if (!loginBtn) {
                 loginBtn = Array.from(document.querySelectorAll('button')).find(btn => {
                     const txt = (btn.textContent || '').trim().toLowerCase();
@@ -303,8 +304,8 @@
         }
 
         // Kiem tra trang thai dang nhap thanh cong
-        const hasUserMenu = document.querySelector('[data-testid="account-nav-menu"]') || 
-                            document.getElementById('radix-_r_0_') || 
+        const hasUserMenu = document.querySelector('[data-testid="account-nav-menu"]') ||
+                            document.getElementById('radix-_r_0_') ||
                             Array.from(document.querySelectorAll('button')).some(btn => {
                                 return btn.getAttribute('aria-haspopup') === 'menu' || btn.getAttribute('aria-expanded') !== null;
                             });

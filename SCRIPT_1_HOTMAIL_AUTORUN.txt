@@ -56,13 +56,13 @@
             element.focus();
             const prototype = Object.getPrototypeOf(element);
             const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
-            
+
             if (descriptor && descriptor.set) {
                 descriptor.set.call(element, value);
             } else {
                 element.value = value;
             }
-            
+
             element.dispatchEvent(new Event('input', { bubbles: true }));
             element.dispatchEvent(new Event('change', { bubbles: true }));
             element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: value }));
@@ -124,7 +124,7 @@
             const emailMatch = banner.textContent.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
             if (emailMatch) return emailMatch[0].toLowerCase().trim();
         }
-        
+
         const matches = document.body.innerText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/g);
         if (matches) {
             const mainEmail = matches.find(m => m.toLowerCase().endsWith('hotmail.com') || m.toLowerCase().endsWith('outlook.com') || m.toLowerCase().endsWith('live.com'));
@@ -137,10 +137,10 @@
         const emailLower = emailText.toLowerCase().trim();
         if (acc.email && emailLower === acc.email.toLowerCase().trim()) return false;
         if (acc.recovery && emailLower === acc.recovery.toLowerCase().trim()) return false;
-        
+
         const newDomains = ['smvmail.com', 'fivermail.com', 'fviainboxes.com', 'fviadropinbox.com', 'fviamail.work', 'dropinboxes.com'];
         const hasNewDomain = newDomains.some(d => emailLower.endsWith('@' + d));
-        
+
         if (emailLower.includes('@') && !hasNewDomain) {
             return true;
         }
@@ -148,24 +148,24 @@
     }
 
     function hasOtpErrorOnPage() {
-        const errorEl = document.getElementById('idDiv_SAOTCC_Error') || 
+        const errorEl = document.getElementById('idDiv_SAOTCC_Error') ||
                         document.getElementById('idDiv_SAOTCS_Error') ||
                         document.querySelector('.alert-error') ||
                         document.querySelector('[id*="error"]') ||
                         document.querySelector('[class*="error"]');
         if (errorEl && errorEl.offsetWidth > 0) {
             const txt = (errorEl.textContent || '').toLowerCase();
-            if (txt.includes('không hoạt động') || txt.includes('không hợp lệ') || txt.includes('không đúng') || 
+            if (txt.includes('không hoạt động') || txt.includes('không hợp lệ') || txt.includes('không đúng') ||
                 txt.includes("didn't work") || txt.includes('incorrect') || txt.includes('invalid') || txt.includes('mã')) {
                 return true;
             }
         }
-        
+
         const pageText = (document.body.innerText || '').toLowerCase();
-        return pageText.includes('không hoạt động') || 
-               pageText.includes('không hợp lệ') || 
-               pageText.includes("didn't work") || 
-               pageText.includes('incorrect code') || 
+        return pageText.includes('không hoạt động') ||
+               pageText.includes('không hợp lệ') ||
+               pageText.includes("didn't work") ||
+               pageText.includes('incorrect code') ||
                pageText.includes('invalid code') ||
                pageText.includes('mã đó không hoạt động') ||
                pageText.includes('mã không đúng');
@@ -239,7 +239,7 @@
                         const data = JSON.parse(res.responseText);
                         const messages = data.msgs || [];
                         let targetMsg = messages.find(msg => msg.f && msg.f.toLowerCase().includes('microsoft'));
-                        
+
                         if (targetMsg) {
                             const bodyUrl = `https://inboxes.com/api/v2/message/${encodeURIComponent(targetMsg.uid)}`;
                             GM_xmlhttpRequest({
@@ -293,7 +293,7 @@
 
     window.addEventListener('DOMContentLoaded', () => {
         initDebug();
-        
+
         setTimeout(() => {
             const interval = setInterval(() => {
                 try {
@@ -371,9 +371,9 @@
         const old_recovery = acc.oldRecovery;
 
         const singleInput = document.querySelector('input[name="otc"], input#idTxtBx_SAOTCC_OTC, input#otcTextBox');
-        const allTelInputs = Array.from(document.querySelectorAll('input')).filter(el => 
-            el.offsetWidth > 0 && 
-            el.type !== 'hidden' && 
+        const allTelInputs = Array.from(document.querySelectorAll('input')).filter(el =>
+            el.offsetWidth > 0 &&
+            el.type !== 'hidden' &&
             (el.name?.includes('otc') || el.id?.includes('otc') || el.maxLength === 1 || el.type === 'tel')
         );
 
@@ -401,15 +401,15 @@
         const nextBtn = document.querySelector('input[type="submit"], button[type="submit"], #idSIButton9, button#submitBtn');
         const emailInput = document.querySelector('input[type="email"], input[name="loginfmt"], input#i0116');
         const passInput = document.querySelector('input[type="password"], input[name="passwd"], input#passwordEntry');
-        
+
         let emailConfirmInput = document.querySelector('input[name="proof"], input#i0027, input#otcEmail, input#emailTxt, input#i0118:not([type="password"])');
         if (!emailConfirmInput && sendCodeBtn) {
-            emailConfirmInput = Array.from(document.querySelectorAll('input')).find(el => 
-                el.offsetWidth > 0 && 
-                el.type !== 'password' && 
-                el.type !== 'checkbox' && 
-                el.type !== 'submit' && 
-                el.type !== 'button' && 
+            emailConfirmInput = Array.from(document.querySelectorAll('input')).find(el =>
+                el.offsetWidth > 0 &&
+                el.type !== 'password' &&
+                el.type !== 'checkbox' &&
+                el.type !== 'submit' &&
+                el.type !== 'button' &&
                 el.type !== 'hidden' &&
                 !el.id.includes('otc') &&
                 el.maxLength !== 1
@@ -418,8 +418,8 @@
 
         const switchToPasswordLink = Array.from(document.querySelectorAll('a, button, input, [role="button"], [role="link"], #idA_PWD_SwitchToPassword')).find(el => {
             const txt = (el.textContent || el.value || '').trim().toLowerCase();
-            return el.id === 'idA_PWD_SwitchToPassword' || 
-                   txt.includes('sử dụng mật khẩu') || 
+            return el.id === 'idA_PWD_SwitchToPassword' ||
+                   txt.includes('sử dụng mật khẩu') ||
                    txt.includes('use your password') ||
                    txt.includes('use a password') ||
                    txt.includes('mật khẩu của bạn');
@@ -458,9 +458,9 @@
         }
 
         if (!emailConfirmInput) {
-            const sendCodeTile = Array.from(document.querySelectorAll('.tile-layout, .tile, [role="button"], a')).find(el => 
-                el.textContent.includes('trangcode.com') || 
-                el.textContent.includes('Gửi mã đến') || 
+            const sendCodeTile = Array.from(document.querySelectorAll('.tile-layout, .tile, [role="button"], a')).find(el =>
+                el.textContent.includes('trangcode.com') ||
+                el.textContent.includes('Gửi mã đến') ||
                 el.textContent.includes('Send code to') ||
                 (old_recovery && el.textContent.includes(old_recovery.substring(0, 2)))
             );
@@ -519,7 +519,7 @@
         fetchOtpFromInboxesOrSmv(targetOtpEmail, function(err, otp) {
             if (otp) {
                 makeRequest(API_OTP_BRIDGE, "POST", { email: targetOtpEmail, otp: otp }, function() {});
-                
+
                 if (allTelInputs.length === otp.length) {
                     setDebug(`🔐 Điền OTP chia nhỏ: ${otp}`, '#16a34a');
                     let filledAll = true;
@@ -587,7 +587,7 @@
         const newPassInput = document.getElementById('iPassword');
         const retypePassInput = document.getElementById('iRetypePassword');
         const updatePassBtn = document.getElementById('UpdatePasswordAction');
-        
+
         if (newPassInput && retypePassInput && acc.newPassword) {
             if (newPassInput.value !== acc.newPassword) {
                 setDebug(`🔑 Đang điền mật khẩu mới...`, '#0284c7');
@@ -620,7 +620,7 @@
         const emailElementsAll = Array.from(document.querySelectorAll('*')).filter(el => {
             return el.children.length === 0 && el.textContent && el.textContent.includes('@') && el.textContent.includes('.');
         });
-        
+
         let actualHasNewRecovery = false;
         const newDomains = ['smvmail.com', 'fivermail.com', 'fviainboxes.com', 'fviadropinbox.com', 'fviamail.work', 'dropinboxes.com'];
         for (const el of emailElementsAll) {
@@ -630,16 +630,16 @@
                 break;
             }
         }
-        
+
         const hasNewRecoveryOnPage = actualHasNewRecovery || (acc.recovery && pageText.toLowerCase().includes(acc.recovery.toLowerCase()));
 
         const recoveryInputs = Array.from(document.querySelectorAll('input[type="email"], input[name="EmailAddress"], input[name="email"], input[placeholder*="example.com"], #EmailAddress, #emailAddress'));
         const recoveryInput = recoveryInputs.find(el => el.offsetWidth > 0);
-        
+
         if (!hasNewRecoveryOnPage && recoveryInput && acc.recovery && recoveryInput.value !== acc.recovery) {
             setDebug(`📬 Điền Email khôi phục mới: ${acc.recovery}`, '#0284c7');
             safeFill(recoveryInput, acc.recovery);
-            
+
             let nextBtn = document.querySelector('input[type="submit"], button[type="submit"], #submitButton, #idSIButton9');
             if (!nextBtn) {
                 nextBtn = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"]')).find(btn => {
@@ -647,7 +647,7 @@
                     return txt === 'tiếp theo' || txt === 'next' || txt.includes('tiếp') || txt.includes('next');
                 });
             }
-            
+
             if (nextBtn) {
                 setTimeout(() => safeClick(nextBtn), 600);
             }
@@ -659,15 +659,15 @@
                 const txt = (el.textContent || '').trim().toLowerCase();
                 return txt.includes('thêm một cách đăng nhập') || txt.includes('add a new way to sign in');
             });
-            
+
             if (addMethodLink) {
                 let emailOption = document.getElementById('Add_email') || document.getElementById('Email');
-                
+
                 if (!emailOption) {
                     emailOption = Array.from(document.querySelectorAll('a, button, [role="button"], span, div')).find(el => {
                         const txt = (el.textContent || '').trim().toLowerCase();
                         const isEmailMatch = txt.includes('gửi mã qua email') || txt.includes('email a code');
-                        
+
                         if (isEmailMatch) {
                             let parent = el.parentElement;
                             for (let depth = 0; depth < 3 && parent; depth++) {
@@ -682,7 +682,7 @@
                         return false;
                     });
                 }
-                
+
                 if (emailOption) {
                     let clickableEl = emailOption;
                     let parent = emailOption.parentElement;
@@ -693,7 +693,7 @@
                         }
                         parent = parent.parentElement;
                     }
-                    
+
                     setDebug(`📬 Click chọn Gửi mã qua email...`, '#0284c7');
                     safeClick(clickableEl);
                 } else {
@@ -706,8 +706,8 @@
 
         let hasOldRecoveryOnPage = false;
         const emailElements = Array.from(document.querySelectorAll('*')).filter(el => {
-            return el.children.length === 0 && 
-                   el.textContent && 
+            return el.children.length === 0 &&
+                   el.textContent &&
                    isOldRecoveryEmail(el.textContent, acc);
         });
 
@@ -819,9 +819,9 @@
                 if (singleInput.value !== otp) {
                     setDebug(`🔐 Điền OTP cào trực tiếp: ${otp}`, '#16a34a');
                     safeFill(singleInput, otp);
-                    
+
                     makeRequest(API_OTP_BRIDGE, "POST", { email: targetOtpEmail, otp: otp }, function() {});
-                    
+
                     setTimeout(() => {
                         const verifyBtn = document.querySelector('input[type="submit"], button[type="submit"], #idSIButton9, #submitBtn, #submitButton');
                         if (verifyBtn) {

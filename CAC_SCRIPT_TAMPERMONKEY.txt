@@ -68,13 +68,13 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
             element.focus();
             const prototype = Object.getPrototypeOf(element);
             const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
-            
+
             if (descriptor && descriptor.set) {
                 descriptor.set.call(element, value);
             } else {
                 element.value = value;
             }
-            
+
             element.dispatchEvent(new Event('input', { bubbles: true }));
             element.dispatchEvent(new Event('change', { bubbles: true }));
             element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: value }));
@@ -136,7 +136,7 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
             const emailMatch = banner.textContent.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
             if (emailMatch) return emailMatch[0].toLowerCase().trim();
         }
-        
+
         const matches = document.body.innerText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/g);
         if (matches) {
             const mainEmail = matches.find(m => m.toLowerCase().endsWith('hotmail.com') || m.toLowerCase().endsWith('outlook.com') || m.toLowerCase().endsWith('live.com'));
@@ -149,10 +149,10 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
         const emailLower = emailText.toLowerCase().trim();
         if (acc.email && emailLower === acc.email.toLowerCase().trim()) return false;
         if (acc.recovery && emailLower === acc.recovery.toLowerCase().trim()) return false;
-        
+
         const newDomains = ['smvmail.com', 'fivermail.com', 'fviainboxes.com', 'fviadropinbox.com', 'fviamail.work', 'dropinboxes.com'];
         const hasNewDomain = newDomains.some(d => emailLower.endsWith('@' + d));
-        
+
         if (emailLower.includes('@') && !hasNewDomain) {
             return true;
         }
@@ -160,24 +160,24 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
     }
 
     function hasOtpErrorOnPage() {
-        const errorEl = document.getElementById('idDiv_SAOTCC_Error') || 
+        const errorEl = document.getElementById('idDiv_SAOTCC_Error') ||
                         document.getElementById('idDiv_SAOTCS_Error') ||
                         document.querySelector('.alert-error') ||
                         document.querySelector('[id*="error"]') ||
                         document.querySelector('[class*="error"]');
         if (errorEl && errorEl.offsetWidth > 0) {
             const txt = (errorEl.textContent || '').toLowerCase();
-            if (txt.includes('khÃ´ng hoáº¡t Ä‘á»™ng') || txt.includes('khÃ´ng há»£p lá»‡') || txt.includes('khÃ´ng Ä‘Ãºng') || 
+            if (txt.includes('khÃ´ng hoáº¡t Ä‘á»™ng') || txt.includes('khÃ´ng há»£p lá»‡') || txt.includes('khÃ´ng Ä‘Ãºng') ||
                 txt.includes("didn't work") || txt.includes('incorrect') || txt.includes('invalid') || txt.includes('mÃ£')) {
                 return true;
             }
         }
-        
+
         const pageText = (document.body.innerText || '').toLowerCase();
-        return pageText.includes('khÃ´ng hoáº¡t Ä‘á»™ng') || 
-               pageText.includes('khÃ´ng há»£p lá»‡') || 
-               pageText.includes("didn't work") || 
-               pageText.includes('incorrect code') || 
+        return pageText.includes('khÃ´ng hoáº¡t Ä‘á»™ng') ||
+               pageText.includes('khÃ´ng há»£p lá»‡') ||
+               pageText.includes("didn't work") ||
+               pageText.includes('incorrect code') ||
                pageText.includes('invalid code') ||
                pageText.includes('mÃ£ Ä‘Ã³ khÃ´ng hoáº¡t Ä‘á»™ng') ||
                pageText.includes('mÃ£ khÃ´ng Ä‘Ãºng');
@@ -251,7 +251,7 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
                         const data = JSON.parse(res.responseText);
                         const messages = data.msgs || [];
                         let targetMsg = messages.find(msg => msg.f && msg.f.toLowerCase().includes('microsoft'));
-                        
+
                         if (targetMsg) {
                             const bodyUrl = `https://inboxes.com/api/v2/message/${encodeURIComponent(targetMsg.uid)}`;
                             GM_xmlhttpRequest({
@@ -305,7 +305,7 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
 
     window.addEventListener('DOMContentLoaded', () => {
         initDebug();
-        
+
         setTimeout(() => {
             const interval = setInterval(() => {
                 try {
@@ -383,9 +383,9 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
         const old_recovery = acc.oldRecovery;
 
         const singleInput = document.querySelector('input[name="otc"], input#idTxtBx_SAOTCC_OTC, input#otcTextBox');
-        const allTelInputs = Array.from(document.querySelectorAll('input')).filter(el => 
-            el.offsetWidth > 0 && 
-            el.type !== 'hidden' && 
+        const allTelInputs = Array.from(document.querySelectorAll('input')).filter(el =>
+            el.offsetWidth > 0 &&
+            el.type !== 'hidden' &&
             (el.name?.includes('otc') || el.id?.includes('otc') || el.maxLength === 1 || el.type === 'tel')
         );
 
@@ -413,15 +413,15 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
         const nextBtn = document.querySelector('input[type="submit"], button[type="submit"], #idSIButton9, button#submitBtn');
         const emailInput = document.querySelector('input[type="email"], input[name="loginfmt"], input#i0116');
         const passInput = document.querySelector('input[type="password"], input[name="passwd"], input#passwordEntry');
-        
+
         let emailConfirmInput = document.querySelector('input[name="proof"], input#i0027, input#otcEmail, input#emailTxt, input#i0118:not([type="password"])');
         if (!emailConfirmInput && sendCodeBtn) {
-            emailConfirmInput = Array.from(document.querySelectorAll('input')).find(el => 
-                el.offsetWidth > 0 && 
-                el.type !== 'password' && 
-                el.type !== 'checkbox' && 
-                el.type !== 'submit' && 
-                el.type !== 'button' && 
+            emailConfirmInput = Array.from(document.querySelectorAll('input')).find(el =>
+                el.offsetWidth > 0 &&
+                el.type !== 'password' &&
+                el.type !== 'checkbox' &&
+                el.type !== 'submit' &&
+                el.type !== 'button' &&
                 el.type !== 'hidden' &&
                 !el.id.includes('otc') &&
                 el.maxLength !== 1
@@ -430,8 +430,8 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
 
         const switchToPasswordLink = Array.from(document.querySelectorAll('a, button, input, [role="button"], [role="link"], #idA_PWD_SwitchToPassword')).find(el => {
             const txt = (el.textContent || el.value || '').trim().toLowerCase();
-            return el.id === 'idA_PWD_SwitchToPassword' || 
-                   txt.includes('sá»­ dá»¥ng máº­t kháº©u') || 
+            return el.id === 'idA_PWD_SwitchToPassword' ||
+                   txt.includes('sá»­ dá»¥ng máº­t kháº©u') ||
                    txt.includes('use your password') ||
                    txt.includes('use a password') ||
                    txt.includes('máº­t kháº©u cá»§a báº¡n');
@@ -470,9 +470,9 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
         }
 
         if (!emailConfirmInput) {
-            const sendCodeTile = Array.from(document.querySelectorAll('.tile-layout, .tile, [role="button"], a')).find(el => 
-                el.textContent.includes('trangcode.com') || 
-                el.textContent.includes('Gá»­i mÃ£ Ä‘áº¿n') || 
+            const sendCodeTile = Array.from(document.querySelectorAll('.tile-layout, .tile, [role="button"], a')).find(el =>
+                el.textContent.includes('trangcode.com') ||
+                el.textContent.includes('Gá»­i mÃ£ Ä‘áº¿n') ||
                 el.textContent.includes('Send code to') ||
                 (old_recovery && el.textContent.includes(old_recovery.substring(0, 2)))
             );
@@ -531,7 +531,7 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
         fetchOtpFromInboxesOrSmv(targetOtpEmail, function(err, otp) {
             if (otp) {
                 makeRequest(API_OTP_BRIDGE, "POST", { email: targetOtpEmail, otp: otp }, function() {});
-                
+
                 if (allTelInputs.length === otp.length) {
                     setDebug(`ðŸ” Äiá»n OTP chia nhá»: ${otp}`, '#16a34a');
                     let filledAll = true;
@@ -599,7 +599,7 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
         const newPassInput = document.getElementById('iPassword');
         const retypePassInput = document.getElementById('iRetypePassword');
         const updatePassBtn = document.getElementById('UpdatePasswordAction');
-        
+
         if (newPassInput && retypePassInput && acc.newPassword) {
             if (newPassInput.value !== acc.newPassword) {
                 setDebug(`ðŸ”‘ Äang Ä‘iá»n máº­t kháº©u má»›i...`, '#0284c7');
@@ -632,7 +632,7 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
         const emailElementsAll = Array.from(document.querySelectorAll('*')).filter(el => {
             return el.children.length === 0 && el.textContent && el.textContent.includes('@') && el.textContent.includes('.');
         });
-        
+
         let actualHasNewRecovery = false;
         const newDomains = ['smvmail.com', 'fivermail.com', 'fviainboxes.com', 'fviadropinbox.com', 'fviamail.work', 'dropinboxes.com'];
         for (const el of emailElementsAll) {
@@ -642,16 +642,16 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
                 break;
             }
         }
-        
+
         const hasNewRecoveryOnPage = actualHasNewRecovery || (acc.recovery && pageText.toLowerCase().includes(acc.recovery.toLowerCase()));
 
         const recoveryInputs = Array.from(document.querySelectorAll('input[type="email"], input[name="EmailAddress"], input[name="email"], input[placeholder*="example.com"], #EmailAddress, #emailAddress'));
         const recoveryInput = recoveryInputs.find(el => el.offsetWidth > 0);
-        
+
         if (!hasNewRecoveryOnPage && recoveryInput && acc.recovery && recoveryInput.value !== acc.recovery) {
             setDebug(`ðŸ“¬ Äiá»n Email khÃ´i phá»¥c má»›i: ${acc.recovery}`, '#0284c7');
             safeFill(recoveryInput, acc.recovery);
-            
+
             let nextBtn = document.querySelector('input[type="submit"], button[type="submit"], #submitButton, #idSIButton9');
             if (!nextBtn) {
                 nextBtn = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"]')).find(btn => {
@@ -659,7 +659,7 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
                     return txt === 'tiáº¿p theo' || txt === 'next' || txt.includes('tiáº¿p') || txt.includes('next');
                 });
             }
-            
+
             if (nextBtn) {
                 setTimeout(() => safeClick(nextBtn), 600);
             }
@@ -671,15 +671,15 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
                 const txt = (el.textContent || '').trim().toLowerCase();
                 return txt.includes('thÃªm má»™t cÃ¡ch Ä‘Äƒng nháº­p') || txt.includes('add a new way to sign in');
             });
-            
+
             if (addMethodLink) {
                 let emailOption = document.getElementById('Add_email') || document.getElementById('Email');
-                
+
                 if (!emailOption) {
                     emailOption = Array.from(document.querySelectorAll('a, button, [role="button"], span, div')).find(el => {
                         const txt = (el.textContent || '').trim().toLowerCase();
                         const isEmailMatch = txt.includes('gá»­i mÃ£ qua email') || txt.includes('email a code');
-                        
+
                         if (isEmailMatch) {
                             let parent = el.parentElement;
                             for (let depth = 0; depth < 3 && parent; depth++) {
@@ -694,7 +694,7 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
                         return false;
                     });
                 }
-                
+
                 if (emailOption) {
                     let clickableEl = emailOption;
                     let parent = emailOption.parentElement;
@@ -705,7 +705,7 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
                         }
                         parent = parent.parentElement;
                     }
-                    
+
                     setDebug(`ðŸ“¬ Click chá»n Gá»­i mÃ£ qua email...`, '#0284c7');
                     safeClick(clickableEl);
                 } else {
@@ -718,8 +718,8 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
 
         let hasOldRecoveryOnPage = false;
         const emailElements = Array.from(document.querySelectorAll('*')).filter(el => {
-            return el.children.length === 0 && 
-                   el.textContent && 
+            return el.children.length === 0 &&
+                   el.textContent &&
                    isOldRecoveryEmail(el.textContent, acc);
         });
 
@@ -831,9 +831,9 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
                 if (singleInput.value !== otp) {
                     setDebug(`ðŸ” Äiá»n OTP cÃ o trá»±c tiáº¿p: ${otp}`, '#16a34a');
                     safeFill(singleInput, otp);
-                    
+
                     makeRequest(API_OTP_BRIDGE, "POST", { email: targetOtpEmail, otp: otp }, function() {});
-                    
+
                     setTimeout(() => {
                         const verifyBtn = document.querySelector('input[type="submit"], button[type="submit"], #idSIButton9, #submitBtn, #submitButton');
                         if (verifyBtn) {
@@ -1040,13 +1040,13 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
             element.focus();
             const prototype = Object.getPrototypeOf(element);
             const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
-            
+
             if (descriptor && descriptor.set) {
                 descriptor.set.call(element, value);
             } else {
                 element.value = value;
             }
-            
+
             element.dispatchEvent(new Event('input', { bubbles: true }));
             element.dispatchEvent(new Event('change', { bubbles: true }));
             element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: value }));
@@ -1153,12 +1153,12 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
 
     function initialize() {
         initDebug();
-        
+
         // 1. Kiem tra xem co phai dang o luong tu dong check khong
         const checkAcc = checkURLHash();
         if (checkAcc) {
             setDebug(`Luong CHECK tu dong!<br>Acc: ${checkAcc.email}`, '#6366f1');
-            
+
             // Loop de tu dong check
             const checkInterval = setInterval(() => {
                 runStep(checkAcc, checkInterval, true);
@@ -1207,11 +1207,12 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
 
         // Kiem tra loi dang nhap truoc
         const bodyText = (document.body.innerText || '').toLowerCase();
-        const isWrongCredsText = bodyText.includes('incorrect') || 
-                                 bodyText.includes("don't recognize") ||
-                                 bodyText.includes("invalid") ||
-                                 bodyText.includes("wrong email") ||
-                                 bodyText.includes("incorrect password");
+        const isWrongCredsText = bodyText.includes('incorrect email or password') || 
+                                 bodyText.includes("don't recognize that email or password") ||
+                                 bodyText.includes("incorrect password") ||
+                                 (bodyText.includes("don't recognize") && (bodyText.includes("email") || bodyText.includes("password"))) ||
+                                 bodyText.includes("wrong email or password") ||
+                                 (bodyText.includes("invalid") && bodyText.includes("password"));
 
         if (isAutoCheck && isWrongCredsText) {
             clearInterval(interval);
@@ -1219,9 +1220,9 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
             return;
         }
 
-        const isLoginPage = path.includes('/auth/signin') || 
-                            path.includes('/sign-in') || 
-                            path.includes('/login') || 
+        const isLoginPage = path.includes('/auth/signin') ||
+                            path.includes('/sign-in') ||
+                            path.includes('/login') ||
                             document.getElementById('id_email') !== null ||
                             document.querySelector('input[type="email"]') !== null ||
                             Array.from(document.querySelectorAll('button, a, span')).some(el => (el.textContent || '').toLowerCase().includes('sign in a different way'));
@@ -1238,12 +1239,12 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
 
             if (!passInput || passInput.offsetWidth === 0) {
                 if (isClickingDiffWay) return;
-                
+
                 const diffWayBtn = Array.from(document.querySelectorAll('button')).find(btn => {
                     const txt = (btn.textContent || '').trim().toLowerCase();
                     return btn.classList.contains('sign-in-secondary-link') || txt.includes('sign in a different way');
                 });
-                
+
                 if (diffWayBtn && diffWayBtn.offsetWidth > 0) {
                     setDebug('Click [Sign in a different way]...', '#0284c7');
                     isClickingDiffWay = true;
@@ -1267,9 +1268,9 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
                 }
             }
 
-            let loginBtn = document.querySelector('button[type="submit"].sign-in-primary-btn') || 
+            let loginBtn = document.querySelector('button[type="submit"].sign-in-primary-btn') ||
                            document.querySelector('button[type="submit"]');
-            
+
             if (!loginBtn) {
                 loginBtn = Array.from(document.querySelectorAll('button')).find(btn => {
                     const txt = (btn.textContent || '').trim().toLowerCase();
@@ -1286,8 +1287,8 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
         }
 
         // Kiem tra trang thai dang nhap thanh cong
-        const hasUserMenu = document.querySelector('[data-testid="account-nav-menu"]') || 
-                            document.getElementById('radix-_r_0_') || 
+        const hasUserMenu = document.querySelector('[data-testid="account-nav-menu"]') ||
+                            document.getElementById('radix-_r_0_') ||
                             Array.from(document.querySelectorAll('button')).some(btn => {
                                 return btn.getAttribute('aria-haspopup') === 'menu' || btn.getAttribute('aria-expanded') !== null;
                             });
@@ -1392,11 +1393,11 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
         if (!element) return false;
         try {
             element.focus();
-            
+
             // 1. Thu goi truc tiep React Event Handlers (Bypass React Aria & isTrusted)
-            const reactPropsKey = Object.keys(element).find(key => 
-                key.startsWith('__reactProps$') || 
-                key.startsWith('__reactEventHandlers$') || 
+            const reactPropsKey = Object.keys(element).find(key =>
+                key.startsWith('__reactProps$') ||
+                key.startsWith('__reactEventHandlers$') ||
                 key.startsWith('__reactInternalInstance$')
             );
             if (reactPropsKey && element[reactPropsKey]) {
@@ -1416,7 +1417,7 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
             const rect = element.getBoundingClientRect();
             const x = rect.left + rect.width / 2 + (Math.random() * 4 - 2);
             const y = rect.top + rect.height / 2 + (Math.random() * 4 - 2);
-            
+
             const eventOpts = {
                 bubbles: true,
                 cancelable: true,
@@ -1437,29 +1438,29 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
                 pressure: 0.5,
                 isPrimary: true
             });
-            
+
             // Gui Down events
             element.dispatchEvent(new PointerEvent('pointerdown', pointerOpts));
             element.dispatchEvent(new MouseEvent('mousedown', eventOpts));
-            
+
             if (typeof element.focus === 'function') {
                 element.focus();
             }
-            
+
             // Tri hoan 50ms de mo phong cu click chuot that (React Aria yeu cau do tre pointerdown -> pointerup)
             setTimeout(() => {
                 element.dispatchEvent(new PointerEvent('pointerup', pointerOpts));
                 element.dispatchEvent(new MouseEvent('mouseup', eventOpts));
-                
+
                 const clickEv = new MouseEvent('click', eventOpts);
                 element.dispatchEvent(clickEv);
-                
+
                 // Dispatch Enter & Space key events
                 element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13 }));
                 element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13 }));
                 element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: ' ', code: 'Space', keyCode: 32 }));
                 element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: ' ', code: 'Space', keyCode: 32 }));
-                
+
                 if (typeof element.click === 'function') {
                     element.click();
                 }
@@ -1538,7 +1539,7 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
             setDebug('Phat hien hom thu cu. Dang click [Delete Inbox]...', '#be123c');
             const targetBtn = deleteBtn.closest('button, a, [role="button"]') || deleteBtn;
             safeClick(targetBtn);
-            
+
             // Tim nut xac nhan xoa trong popup sau 400ms
             setTimeout(() => {
                 const confirmDeleteBtn = Array.from(document.querySelectorAll('button, a, span')).find(btn => {
@@ -1555,7 +1556,7 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
         }
 
         // 1. Kiem tra xem popup "Add Inbox" da hien thi chua
-        const usernameInput = document.querySelector('input[placeholder*="username"]') || 
+        const usernameInput = document.querySelector('input[placeholder*="username"]') ||
                               document.querySelector('input[placeholder*="Username"]') ||
                               Array.from(document.querySelectorAll('input')).find(input => {
                                   const ph = (input.placeholder || '').toLowerCase();
@@ -1564,7 +1565,7 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
 
         if (usernameInput && usernameInput.offsetWidth > 0) {
             // Popup dang mo -> Tien hanh dien va chon
-            
+
             // A. Dien username
             if (usernameInput.value !== username) {
                 setDebug(`Dien username: ${username}`, '#0284c7');
@@ -1596,7 +1597,7 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
             // Cach 2: Tim va click Custom Select Dropdown
             let selectBtn = null;
             if (!isDomainMatched) {
-                selectBtn = document.querySelector('button[id*="domain"]') || 
+                selectBtn = document.querySelector('button[id*="domain"]') ||
                             Array.from(document.querySelectorAll('button, div, span, p, label')).find(el => {
                                 const txt = (el.textContent || '').trim().toLowerCase();
                                 const isSuffix = txt.endsWith('.com') || txt.endsWith('.work') || txt.endsWith('.info') || txt.includes('.com') || txt.includes('.work') || txt.includes('.info');

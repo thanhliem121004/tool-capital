@@ -67,11 +67,11 @@
         if (!element) return false;
         try {
             element.focus();
-            
+
             // 1. Thu goi truc tiep React Event Handlers (Bypass React Aria & isTrusted)
-            const reactPropsKey = Object.keys(element).find(key => 
-                key.startsWith('__reactProps$') || 
-                key.startsWith('__reactEventHandlers$') || 
+            const reactPropsKey = Object.keys(element).find(key =>
+                key.startsWith('__reactProps$') ||
+                key.startsWith('__reactEventHandlers$') ||
                 key.startsWith('__reactInternalInstance$')
             );
             if (reactPropsKey && element[reactPropsKey]) {
@@ -91,7 +91,7 @@
             const rect = element.getBoundingClientRect();
             const x = rect.left + rect.width / 2 + (Math.random() * 4 - 2);
             const y = rect.top + rect.height / 2 + (Math.random() * 4 - 2);
-            
+
             const eventOpts = {
                 bubbles: true,
                 cancelable: true,
@@ -112,29 +112,29 @@
                 pressure: 0.5,
                 isPrimary: true
             });
-            
+
             // Gui Down events
             element.dispatchEvent(new PointerEvent('pointerdown', pointerOpts));
             element.dispatchEvent(new MouseEvent('mousedown', eventOpts));
-            
+
             if (typeof element.focus === 'function') {
                 element.focus();
             }
-            
+
             // Tri hoan 50ms de mo phong cu click chuot that (React Aria yeu cau do tre pointerdown -> pointerup)
             setTimeout(() => {
                 element.dispatchEvent(new PointerEvent('pointerup', pointerOpts));
                 element.dispatchEvent(new MouseEvent('mouseup', eventOpts));
-                
+
                 const clickEv = new MouseEvent('click', eventOpts);
                 element.dispatchEvent(clickEv);
-                
+
                 // Dispatch Enter & Space key events
                 element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13 }));
                 element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13 }));
                 element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: ' ', code: 'Space', keyCode: 32 }));
                 element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: ' ', code: 'Space', keyCode: 32 }));
-                
+
                 if (typeof element.click === 'function') {
                     element.click();
                 }
@@ -213,7 +213,7 @@
             setDebug('Phat hien hom thu cu. Dang click [Delete Inbox]...', '#be123c');
             const targetBtn = deleteBtn.closest('button, a, [role="button"]') || deleteBtn;
             safeClick(targetBtn);
-            
+
             // Tim nut xac nhan xoa trong popup sau 400ms
             setTimeout(() => {
                 const confirmDeleteBtn = Array.from(document.querySelectorAll('button, a, span')).find(btn => {
@@ -230,7 +230,7 @@
         }
 
         // 1. Kiem tra xem popup "Add Inbox" da hien thi chua
-        const usernameInput = document.querySelector('input[placeholder*="username"]') || 
+        const usernameInput = document.querySelector('input[placeholder*="username"]') ||
                               document.querySelector('input[placeholder*="Username"]') ||
                               Array.from(document.querySelectorAll('input')).find(input => {
                                   const ph = (input.placeholder || '').toLowerCase();
@@ -239,7 +239,7 @@
 
         if (usernameInput && usernameInput.offsetWidth > 0) {
             // Popup dang mo -> Tien hanh dien va chon
-            
+
             // A. Dien username
             if (usernameInput.value !== username) {
                 setDebug(`Dien username: ${username}`, '#0284c7');
@@ -271,7 +271,7 @@
             // Cach 2: Tim va click Custom Select Dropdown
             let selectBtn = null;
             if (!isDomainMatched) {
-                selectBtn = document.querySelector('button[id*="domain"]') || 
+                selectBtn = document.querySelector('button[id*="domain"]') ||
                             Array.from(document.querySelectorAll('button, div, span, p, label')).find(el => {
                                 const txt = (el.textContent || '').trim().toLowerCase();
                                 const isSuffix = txt.endsWith('.com') || txt.endsWith('.work') || txt.endsWith('.info') || txt.includes('.com') || txt.includes('.work') || txt.includes('.info');
