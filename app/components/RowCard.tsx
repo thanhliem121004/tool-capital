@@ -620,7 +620,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
         isActive 
           ? 'border-blue-500 ring-4 ring-blue-400 ring-opacity-40 shadow-blue-200 shadow-xl z-10 bg-blue-50/10 active-bounce-effect' 
           : isPasswordError
-            ? 'border-red-400 bg-red-50'
+            ? 'border-red-400 bg-red-50 opacity-40 grayscale-[30%] hover:opacity-100'
             : isDone 
               ? 'border-green-400 bg-green-50' 
               : 'border-orange-200 bg-orange-50 hover:border-blue-300 gentle-bounce-effect'
@@ -659,7 +659,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                   : 'bg-orange-400 text-white'
           }`}
         >
-          {isActive ? '⚡ Đang chạy...' : isPasswordError ? '❌ Sai mật khẩu' : isDone ? '✓ Đã làm' : '⏳ Đang làm'}
+          {isActive ? '⚡ Đang chạy...' : isPasswordError ? (mode === 'capital' ? '❌ Sai Capital' : '❌ Sai mật khẩu') : isDone ? (mode === 'capital' ? '✅ Capital OK' : '✓ Đã làm') : '⏳ Đang làm'}
         </span>
       </div>
 
@@ -751,7 +751,8 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                 if (capitalUrl) window.open(capitalUrl, '_blank');
               }
             }}
-            className="flex-1 mt-1 px-3 py-2 bg-blue-100 text-blue-700 rounded border border-blue-200 hover:bg-blue-200 transition-colors font-medium text-xs flex items-center h-[38px] justify-center whitespace-nowrap animate-pulse"
+            disabled={isPasswordError}
+            className="flex-1 mt-1 px-3 py-2 bg-blue-100 text-blue-700 rounded border border-blue-200 hover:bg-blue-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 disabled:cursor-not-allowed transition-colors font-medium text-xs flex items-center h-[38px] justify-center whitespace-nowrap animate-pulse"
             title="Đăng nhập tự động vào Hotmail"
           >
             🔑 Vào Hotmail
@@ -759,8 +760,8 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
           
           <button
             onClick={handleMarkPasswordError}
-            disabled={loadingMarkError}
-            className="mt-1 px-3 py-2 bg-red-100 text-red-700 rounded border border-red-200 hover:bg-red-200 disabled:bg-gray-200 transition-colors font-medium text-xs flex items-center h-[38px] justify-center whitespace-nowrap"
+            disabled={isPasswordError || loadingMarkError}
+            className="mt-1 px-3 py-2 bg-red-100 text-red-700 rounded border border-red-200 hover:bg-red-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 disabled:cursor-not-allowed transition-colors font-medium text-xs flex items-center h-[38px] justify-center whitespace-nowrap"
             title="Đánh dấu tài khoản bị sai mật khẩu và tô đỏ trên Google Sheet"
           >
             ❌ {loadingMarkError ? 'Đang lưu...' : 'Sai MK'}
@@ -770,7 +771,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
           <div className="flex flex-col gap-1.5 mt-2">
             <button
               onClick={handleCheckCapital}
-              disabled={checkingCapital}
+              disabled={isPasswordError || checkingCapital}
               className={`w-full px-3 py-2 rounded border text-xs font-semibold flex items-center justify-center h-[38px] transition-all duration-300 ${
                 checkCapitalResult === 'ok'
                   ? 'bg-green-600 text-white border-green-700 hover:bg-green-700 shadow-md shadow-green-100'
@@ -811,7 +812,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
               href={`https://sellallmail.com/mailbox/${row.oldRecovery}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="mb-3 px-3 py-2 bg-blue-100 text-blue-700 rounded border border-blue-200 hover:bg-blue-200 transition-colors font-medium text-xs flex items-center h-[38px] justify-center whitespace-nowrap"
+              className={`mb-3 px-3 py-2 bg-blue-100 text-blue-700 rounded border border-blue-200 hover:bg-blue-200 transition-colors font-medium text-xs flex items-center h-[38px] justify-center whitespace-nowrap ${isPasswordError ? 'pointer-events-none opacity-50 bg-gray-100 text-gray-400 border-gray-200' : ''}`}
               title="Mở hòm thư cũ trên sellallmail.com"
             >
               📬 Vào Mailbox
@@ -874,7 +875,8 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                 window.open(capitalUrl, '_blank');
               }
             }}
-            className="mb-3 px-3 py-2 bg-purple-100 text-purple-700 rounded border border-purple-200 hover:bg-purple-200 transition-colors font-medium text-xs flex items-center h-[38px] justify-center whitespace-nowrap"
+            disabled={isPasswordError}
+            className="mb-3 px-3 py-2 bg-purple-100 text-purple-700 rounded border border-purple-200 hover:bg-purple-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 disabled:cursor-not-allowed transition-colors font-medium text-xs flex items-center h-[38px] justify-center whitespace-nowrap"
             title="Mở trang đăng nhập Capital One Shopping"
           >
             🛍️ Vào Capital
@@ -982,8 +984,8 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
       ) : (
         <button
           onClick={handleCreate}
-          disabled={loadingCreate}
-          className="w-full px-4 py-2 mt-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium"
+          disabled={isPasswordError || loadingCreate}
+          className="w-full px-4 py-2 mt-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
         >
           {loadingCreate ? '⏳ Đang tạo...' : (mode === 'capital' ? '✨ Tạo thông tin mới' : '✨ Tạo mail khôi phục')}
         </button>

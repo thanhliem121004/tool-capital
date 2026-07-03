@@ -84,7 +84,19 @@ export default function Home() {
       return true;
     });
 
-    result.sort((a, b) => a.rowIndex - b.rowIndex);
+    result.sort((a, b) => {
+      const getPriority = (r: any) => {
+        if (r.isPasswordError) return 2;
+        if (r.isDone) return 1;
+        return 0;
+      };
+      const priA = getPriority(a);
+      const priB = getPriority(b);
+      if (priA !== priB) {
+        return priA - priB;
+      }
+      return a.rowIndex - b.rowIndex;
+    });
 
     return result;
   }, [rows, selectedName, statusFilter, searchText, mode]);
