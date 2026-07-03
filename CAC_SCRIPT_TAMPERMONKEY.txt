@@ -1221,6 +1221,61 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
             return;
         }
 
+        // 1. NEU DANG O TRANG PROFILE (ACCOUNT SETTINGS)
+        if (path.includes('/account-settings/profile') || path.includes('/profile')) {
+            if (isAutoCheck) {
+                clearInterval(interval);
+                reportResult(acc, 'ok');
+                return;
+            }
+
+            // Luong doi mat khau
+            const currentPassInput = document.getElementById('id_currentPassword') || document.querySelector('input[name="currentPassword"]');
+            const newPassInput = document.getElementById('id_newPassword') || document.querySelector('input[name="newPassword"]');
+
+            if (currentPassInput && currentPassInput.offsetWidth > 0 && newPassInput && newPassInput.offsetWidth > 0) {
+                if (currentPassInput.value !== acc.mkCapital) {
+                    setDebug('ðŸ”‘ Dien Current Password (MK cu)...', '#0284c7');
+                    safeFill(currentPassInput, acc.mkCapital);
+                }
+                
+                if (newPassInput.value !== acc.newMkCapital) {
+                    setDebug('âœ¨ Dien New Password (MK MOI)...', '#0284c7');
+                    safeFill(newPassInput, acc.newMkCapital);
+                }
+
+                if (currentPassInput.value === acc.mkCapital && newPassInput.value === acc.newMkCapital) {
+                    const saveBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                        const txt = (btn.textContent || '').trim().toLowerCase();
+                        return btn.type === 'submit' || txt.includes('save') || txt.includes('change password') || txt.includes('update');
+                    });
+                    if (saveBtn) {
+                        setDebug('ðŸ’¾ Click [Save] luu mat khau moi...', '#16a34a');
+                        safeClick(saveBtn);
+                        
+                        // Sau khi click Save de doi mat khau thanh cong, ta tu dong bao cao ket qua OK ve tool
+                        setTimeout(() => {
+                            reportResult(acc, 'ok');
+                        }, 2500);
+                    }
+                }
+                return;
+            }
+
+            const changeBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                const txt = (btn.textContent || '').trim().toLowerCase();
+                return txt === 'change' || (btn.classList.contains('secondary-btn-large') && txt.includes('change')) || (btn.className && typeof btn.className === 'string' && btn.className.includes('secondary-btn') && txt.includes('change'));
+            });
+
+            if (changeBtn && changeBtn.offsetWidth > 0) {
+                setDebug('ðŸ–±ï¸ Click [Change] mat khau...', '#0284c7');
+                safeClick(changeBtn);
+                return;
+            }
+            return;
+        }
+
+        // 2. NEU DANG O TRANG DANG NHAP (SIGN IN)
         const isLoginPage = path.includes('/auth/signin') ||
                             path.includes('/sign-in') ||
                             path.includes('/login') ||
@@ -1229,7 +1284,6 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
                             Array.from(document.querySelectorAll('button, a, span')).some(el => (el.textContent || '').toLowerCase().includes('sign in a different way'));
 
         if (isLoginPage) {
-            // Tim cac input dang hien thi tren man hinh
             const emailInput = Array.from(document.querySelectorAll('input[type="email"], input[id*="email"], input[name*="email"]'))
                                     .find(el => el.offsetWidth > 0 && el.offsetHeight > 0) ||
                                document.querySelector('input[type="email"]');
@@ -1287,7 +1341,7 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
             return;
         }
 
-        // Kiem tra trang thai dang nhap thanh cong
+        // 3. KIEM TRA LOGGED IN (USER MENU) DE CHUYEN HUONG
         const hasUserMenu = document.querySelector('[data-testid="account-nav-menu"]') ||
                             document.getElementById('radix-_r_0_') ||
                             Array.from(document.querySelectorAll('button')).some(btn => {
@@ -1297,7 +1351,6 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
         if (hasUserMenu || (path !== '/sign-in' && !path.includes('/sign-in') && !path.includes('/auth/signin'))) {
             clearInterval(interval);
             if (isAutoCheck) {
-                // Neu dang o luong check tu dong, bao cao ket qua OK va dong tab
                 reportResult(acc, 'ok');
             } else {
                 setDebug('Dang nhap thanh cong! Dang chuyen huong sang trang Profile...', '#16a34a');
@@ -1306,6 +1359,7 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
             return;
         }
 
+        // 4. KIEM TRA SIGN IN LINK DE CLICK VAO
         const signInLink = Array.from(document.querySelectorAll('a, button')).find(el => {
             const txt = (el.textContent || '').trim().toLowerCase();
             const href = el.getAttribute('href') || '';
