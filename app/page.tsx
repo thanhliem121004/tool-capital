@@ -142,7 +142,7 @@ export default function Home() {
             sheetName,
             rowIndex: row.rowIndex,
             email: row.email,
-            mkCapital: row.mkCapital,
+            mkCapital: row.mkCapital || row.password,
           }),
         });
         const data = await res.json();

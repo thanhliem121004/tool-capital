@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
 
     if (!sheetId || !rowIndex || !email || !mkCapital) {
       return NextResponse.json(
-        { success: false, error: 'Thiếu tham số bắt buộc' },
+        { success: false, error: 'Thiếu mật khẩu Capital One (hoặc mật khẩu Hotmail dự phòng) cho dòng này!' },
         { status: 400 }
       );
     }
