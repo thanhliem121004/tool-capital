@@ -5,6 +5,7 @@ import { useSheet } from './hooks/useSheet';
 import { SheetForm } from './components/SheetForm';
 import { FilterBar } from './components/FilterBar';
 import { RowCard } from './components/RowCard';
+import { MercuryCard } from './components/MercuryCard';
 
 const DEFAULT_SHEET_ID = '1AB2LGfQqGP5es9nU2vMuwldI1HabyV1pyrVOhOC4GRE';
 const DEFAULT_SHEET_NAME = 'Sheet1';
@@ -23,6 +24,41 @@ export default function Home() {
   const [iframeKey, setIframeKey] = useState(0);
   const [mailProvider, setMailProvider] = useState<'inboxes' | 'fvia'>('inboxes');
   const [preferredDomain, setPreferredDomain] = useState('random');
+
+  // States dành riêng cho chế độ Mercury
+  const [mercuryRows, setMercuryRows] = useState<any[]>([]);
+  const [mercuryLoading, setMercuryLoading] = useState(false);
+  const [mercuryError, setMercuryError] = useState('');
+
+  const fetchMercuryRows = async () => {
+    setMercuryLoading(true);
+    setMercuryError('');
+    try {
+      const res = await fetch('/api/mercury/accounts');
+      const data = await res.json();
+      if (data.success) {
+        setMercuryRows(data.rows || []);
+      } else {
+        setMercuryError(data.error || 'Lỗi tải danh sách Mercury');
+      }
+    } catch (e: any) {
+      setMercuryError(e.message || String(e));
+    } finally {
+      setMercuryLoading(false);
+    }
+  };
+
+  const patchMercuryRow = (rowIndex: number, updates: Partial<any>) => {
+    setMercuryRows(prev =>
+      prev.map(r => (r.rowIndex === rowIndex ? { ...r, ...updates } : r))
+    );
+  };
+
+  useEffect(() => {
+    if (mode === ('mercury' as any)) {
+      fetchMercuryRows();
+    }
+  }, [mode]);
 
   // Lắng nghe token từ iframe gửi lên
   useEffect(() => {
@@ -65,12 +101,47 @@ export default function Home() {
   const [searchText, setSearchText] = useState('');
 
   const uniqueNames = useMemo(() => {
+    if (mode === ('mercury' as any)) return [];
     const set = new Set<string>();
     rows.forEach(r => { if (r.name) set.add(r.name); });
     return Array.from(set).sort();
-  }, [rows]);
+  }, [rows, mode]);
 
   const filtered = useMemo(() => {
+    if (mode === ('mercury' as any)) {
+      const result = mercuryRows.filter(r => {
+        if (statusFilter === 'done' && !r.isDone) return false;
+        if (statusFilter === 'not-done' && r.isDone) return false;
+        if (searchText) {
+          const q = searchText.toLowerCase();
+          const hay = (
+            (r["Name Org"] || '') + ' ' + 
+            (r["Full name"] || '') + ' ' + 
+            (r["EIN"] || '') + ' ' + 
+            (r["SSN"] || '') + ' ' + 
+            (r.email || '')
+          ).toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+
+      result.sort((a, b) => {
+        const getPriority = (r: any) => {
+          if (r.isPasswordError) return 2;
+          if (r.isDone) return 1;
+          return 0;
+        };
+        const priA = getPriority(a);
+        const priB = getPriority(b);
+        if (priA !== priB) {
+          return priA - priB;
+        }
+        return a.rowIndex - b.rowIndex;
+      });
+      return result;
+    }
+
     const result = rows.filter(r => {
       if (mode !== 'capital' && selectedName && selectedName !== 'all' && r.name !== selectedName) return false;
       if (statusFilter === 'done' && !r.isDone) return false;
@@ -99,10 +170,21 @@ export default function Home() {
     });
 
     return result;
-  }, [rows, selectedName, statusFilter, searchText, mode]);
+  }, [rows, mercuryRows, selectedName, statusFilter, searchText, mode]);
 
-  const doneCount = filtered.filter(r => r.isDone).length;
-  const notDoneCount = filtered.length - doneCount;
+  const doneCount = useMemo(() => {
+    if (mode === ('mercury' as any)) {
+      return mercuryRows.filter(r => r.isDone).length;
+    }
+    return filtered.filter(r => r.isDone).length;
+  }, [filtered, mercuryRows, mode]);
+
+  const notDoneCount = useMemo(() => {
+    if (mode === ('mercury' as any)) {
+      return mercuryRows.length - doneCount;
+    }
+    return filtered.length - doneCount;
+  }, [filtered, mercuryRows, mode, doneCount]);
 
   // Phân trang gọn gàng (Pagination)
   const [currentPage, setCurrentPage] = useState(1);
@@ -284,6 +366,12 @@ export default function Home() {
                 >
                   Capital One
                 </button>
+                <button
+                  onClick={() => { setMode('mercury' as any); setSelectedName('Mercury'); }}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${mode === ('mercury' as any) ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                >
+                  Mercury Reg
+                </button>
               </div>
 
               {/* Provider Toggle */}
@@ -426,7 +514,51 @@ export default function Home() {
           </div>
         )}
 
-        {rows.length > 0 && mode !== 'capital' && (
+        {mercuryError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-6">
+            ❌ {mercuryError}
+          </div>
+        )}
+
+        {mode === ('mercury' as any) && mercuryRows.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">📌 Trạng thái:</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as 'all' | 'done' | 'not-done')}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value="all">Tất cả</option>
+                  <option value="not-done">⏳ Chưa đăng ký</option>
+                  <option value="done">✅ Đã làm xong</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">🔎 Tìm kiếm doanh nghiệp:</label>
+                <input
+                  type="text"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  placeholder="Tìm theo Tên công ty, tên chủ, EIN, SSN..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-800"
+                />
+              </div>
+              <div className="flex items-end">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-2.5 rounded-lg w-full text-sm border border-indigo-100 flex justify-between">
+                  <div>📋 Hiển thị: <b>{filtered.length}</b> / {mercuryRows.length}</div>
+                  <div>
+                    ✅ <b className="text-green-600">{mercuryRows.filter(r => r.isDone).length}</b>{' '}
+                    ⏳ <b className="text-indigo-600">{mercuryRows.filter(r => !r.isDone).length}</b>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {rows.length > 0 && mode !== 'capital' && mode !== ('mercury' as any) && (
           <FilterBar
             uniqueNames={uniqueNames}
             selectedName={selectedName}
@@ -553,7 +685,19 @@ export default function Home() {
           </>
         )}
 
-        {rows.length > 0 && selectedName === '' && mode !== 'capital' && (
+        {mercuryRows.length > 0 && mode === ('mercury' as any) && (
+          <div className="flex flex-wrap gap-3 mb-6">
+            <button
+              onClick={fetchMercuryRows}
+              disabled={mercuryLoading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-semibold"
+            >
+              {mercuryLoading ? '⏳ Đang tải...' : '🔄 Refresh Mercury'}
+            </button>
+          </div>
+        )}
+
+        {rows.length > 0 && selectedName === '' && mode !== 'capital' && mode !== ('mercury' as any) && (
           <div className="text-center text-gray-500 py-12 bg-white rounded-lg shadow border-2 border-dashed border-gray-300 mb-6">
             <span className="text-2xl mb-2 block">👆</span>
             Vui lòng chọn người ở mục <strong>"Lọc theo người"</strong> bên trên để hiển thị danh sách tài khoản.
@@ -619,22 +763,36 @@ export default function Home() {
 
             {/* Grid hiển thị danh sách RowCard */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {paginatedRows.map((row, idx) => (
-                <RowCard
-                  key={row.rowIndex}
-                  row={row}
-                  index={idx}
-                  sheetId={sheetId}
-                  sheetName={sheetName}
-                  onUpdated={patchRow}
-                  fviaToken={fviaToken}
-                  preferredDomain={preferredDomain}
-                  mailProvider={mailProvider}
-                  mode={mode}
-                  activeEmail={activeEmail}
-                  onActive={setActiveEmail}
-                />
-              ))}
+              {mode === ('mercury' as any) ? (
+                paginatedRows.map((row) => (
+                  <MercuryCard
+                    key={row.rowIndex}
+                    row={row}
+                    onUpdated={patchMercuryRow}
+                    mailProvider={mailProvider}
+                    preferredDomain={preferredDomain}
+                    activeEmail={activeEmail}
+                    onActive={setActiveEmail}
+                  />
+                ))
+              ) : (
+                paginatedRows.map((row, idx) => (
+                  <RowCard
+                    key={row.rowIndex}
+                    row={row}
+                    index={idx}
+                    sheetId={sheetId}
+                    sheetName={sheetName}
+                    onUpdated={patchRow}
+                    fviaToken={fviaToken}
+                    preferredDomain={preferredDomain}
+                    mailProvider={mailProvider}
+                    mode={mode}
+                    activeEmail={activeEmail}
+                    onActive={setActiveEmail}
+                  />
+                ))
+              )}
             </div>
 
             {/* Pagination Controls */}
