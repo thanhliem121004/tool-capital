@@ -113,6 +113,7 @@ export default function Home() {
   const [bulkCheckProgress, setBulkCheckProgress] = useState({ current: 0, total: 0 });
   const [bulkCheckStatusText, setBulkCheckStatusText] = useState('');
   const [startRowInput, setStartRowInput] = useState('2');
+  const [autoNext, setAutoNext] = useState(false);
 
   const handleBulkCheckCapital = async () => {
     const startRowVal = parseInt(startRowInput, 10) || 2;
@@ -121,7 +122,8 @@ export default function Home() {
       alert(`Không có tài khoản nào có số dòng >= ${startRowVal} phù hợp cần check đăng nhập Capital!`);
       return;
     }
-    if (!window.confirm(`Bạn có chắc chắn muốn tự động kiểm tra đăng nhập ngầm cho ${targets.length} tài khoản (từ dòng ${startRowVal} trở đi) chưa làm này không?`)) {
+    const modeText = autoNext ? 'TỰ ĐỘNG LƯU & CUỐN CHIẾU' : 'chỉ kiểm tra hiển thị';
+    if (!window.confirm(`Bạn có chắc chắn muốn tự động kiểm tra đăng nhập ngầm cho ${targets.length} tài khoản (từ dòng ${startRowVal} trở đi) chưa làm này với chế độ [${modeText}] không?`)) {
       return;
     }
 
@@ -167,11 +169,63 @@ export default function Home() {
             if (statusData.success && statusData.hasResult) {
               const result = statusData.result;
               if (result.status === 'ok') {
-                patchRow(row.rowIndex, { isPasswordError: false, newPassword: '' });
-                setBulkCheckStatusText(`✅ Tài khoản #${row.rowIndex} OK!`);
+                if (autoNext) {
+                  setBulkCheckStatusText(`✅ Tài khoản #${row.rowIndex} OK! Đang tự động lưu lên Sheet...`);
+                  try {
+                    const saveRes = await fetch('/api/complete-row', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        sheetId,
+                        sheetName,
+                        rowIndex: row.rowIndex,
+                        recovery: row.recovery || '',
+                        mode: 'capital',
+                        email: row.email,
+                        newMkHotmail: 'OK',
+                        newMkCapital: 'OK',
+                      }),
+                    });
+                    const saveData = await saveRes.json();
+                    if (!saveData.success) throw new Error(saveData.error || 'Lỗi lưu Google Sheet');
+                    patchRow(row.rowIndex, { isDone: true, isPasswordError: false, newPassword: 'OK', newMkCapital: 'OK' });
+                    setBulkCheckStatusText(`✅ Tài khoản #${row.rowIndex} OK! Đã tự động lưu lên Sheet.`);
+                  } catch (saveErr: any) {
+                    console.error('Lỗi tự động lưu dòng OK:', saveErr);
+                    patchRow(row.rowIndex, { isPasswordError: false, newPassword: '' });
+                    setBulkCheckStatusText(`⚠️ Tài khoản #${row.rowIndex} OK nhưng lưu Sheet lỗi: ${saveErr.message || String(saveErr)}`);
+                  }
+                } else {
+                  patchRow(row.rowIndex, { isPasswordError: false, newPassword: '' });
+                  setBulkCheckStatusText(`✅ Tài khoản #${row.rowIndex} OK!`);
+                }
               } else {
-                patchRow(row.rowIndex, { isPasswordError: true, newPassword: 'SAI CAPITAL' });
-                setBulkCheckStatusText(`❌ Tài khoản #${row.rowIndex} bị sai mật khẩu.`);
+                if (autoNext) {
+                  setBulkCheckStatusText(`❌ Tài khoản #${row.rowIndex} SAI! Đang tự động tô đỏ & lưu lỗi...`);
+                  try {
+                    const errorRes = await fetch('/api/mark-error', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        sheetId,
+                        sheetName,
+                        rowIndex: row.rowIndex,
+                        mode: 'capital',
+                      }),
+                    });
+                    const errorData = await errorRes.json();
+                    if (!errorData.success) throw new Error(errorData.error || 'Lỗi tô đỏ Google Sheet');
+                    patchRow(row.rowIndex, { isPasswordError: true, newPassword: 'SAI CAPITAL' });
+                    setBulkCheckStatusText(`❌ Tài khoản #${row.rowIndex} SAI! Đã tự động tô đỏ & lưu lỗi.`);
+                  } catch (saveErr: any) {
+                    console.error('Lỗi tự động lưu dòng lỗi:', saveErr);
+                    patchRow(row.rowIndex, { isPasswordError: true, newPassword: 'SAI CAPITAL' });
+                    setBulkCheckStatusText(`⚠️ Tài khoản #${row.rowIndex} SAI nhưng tô đỏ Sheet lỗi: ${saveErr.message || String(saveErr)}`);
+                  }
+                } else {
+                  patchRow(row.rowIndex, { isPasswordError: true, newPassword: 'SAI CAPITAL' });
+                  setBulkCheckStatusText(`❌ Tài khoản #${row.rowIndex} bị sai mật khẩu.`);
+                }
               }
               hasResult = true;
               break; // Đã nhận kết quả, thoát vòng lặp polling
@@ -186,8 +240,8 @@ export default function Home() {
         console.error(`Lỗi khi check hàng #${row.rowIndex}:`, e);
       }
       
-      // Chờ thêm 1 giây trước khi mở acc tiếp theo để tránh dồn dập
-      await new Promise(r => setTimeout(r, 1000));
+      // Chờ thêm 3 giây trước khi mở acc tiếp theo để tránh dồn dập và cho phép tab cũ đóng hẳn
+      await new Promise(r => setTimeout(r, 3000));
     }
 
     setBulkChecking(false);
@@ -434,20 +488,35 @@ export default function Home() {
                 🌐 Web mail KP
               </a>
               {mode === 'capital' && rows.length > 0 && (
-                <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-lg">
-                  <span className="text-xs font-semibold text-indigo-700 whitespace-nowrap">Bắt đầu từ dòng:</span>
-                  <input
-                    type="number"
-                    min="2"
-                    value={startRowInput}
-                    onChange={(e) => setStartRowInput(e.target.value)}
-                    disabled={bulkChecking}
-                    className="w-16 px-2 py-1 border border-indigo-300 rounded text-center text-sm outline-none font-bold text-indigo-900 bg-white"
-                  />
+                <div className="flex flex-wrap items-center gap-3 bg-indigo-50 border border-indigo-200 px-4 py-2 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-indigo-700 whitespace-nowrap">Bắt đầu từ dòng:</span>
+                    <input
+                      type="number"
+                      min="2"
+                      value={startRowInput}
+                      onChange={(e) => setStartRowInput(e.target.value)}
+                      disabled={bulkChecking}
+                      className="w-16 px-2 py-1 border border-indigo-300 rounded text-center text-sm outline-none font-bold text-indigo-900 bg-white"
+                    />
+                  </div>
+                  
+                  {/* Auto-Next Toggle */}
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-indigo-700 bg-white border border-indigo-200 px-2.5 py-1.5 rounded hover:bg-indigo-100 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={autoNext}
+                      onChange={(e) => setAutoNext(e.target.checked)}
+                      disabled={bulkChecking}
+                      className="w-3.5 h-3.5 cursor-pointer rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    🔄 Tự động lưu & chạy tiếp (Auto-Next)
+                  </label>
+
                   <button
                     onClick={handleBulkCheckCapital}
                     disabled={bulkChecking || loading}
-                    className="px-4 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 font-bold transition-all text-sm whitespace-nowrap"
+                    className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 font-bold transition-all text-sm whitespace-nowrap shadow-sm shadow-indigo-100"
                   >
                     {bulkChecking ? `⏳ Đang check (${bulkCheckProgress.current}/${bulkCheckProgress.total})...` : '⚡ Check All Capital'}
                   </button>

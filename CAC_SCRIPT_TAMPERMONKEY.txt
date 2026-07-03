@@ -992,6 +992,7 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
 // @grant        GM_getValue
+// @grant        window.close
 // @connect      127.0.0.1
 // @connect      localhost
 // @run-at       document-end
