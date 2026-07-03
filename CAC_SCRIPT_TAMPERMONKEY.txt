@@ -1,8 +1,8 @@
 ﻿========================================================================
-     DANH SACH 5 SCRIPT TAMPERMONKEY CAN CAI DAT (DONG BO 100% KHONG LOI)
+     DANH SACH 6 SCRIPT TAMPERMONKEY CAN CAI DAT (DONG BO 100% KHONG LOI)
 ========================================================================
 
-Ban can cai dat ca 5 script duoi day vao Tampermonkey de he thong tu dong hoa hoat dong tron tru.
+Ban can cai dat ca 6 script duoi day vao Tampermonkey de he thong tu dong hoa hoat dong tron tru.
 Co the copy tung phan duoi day va add moi vao Tampermonkey.
 
 ========================================================================
@@ -2113,6 +2113,269 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
             if (bizAddressInput && bizAddressInput.offsetWidth > 0 && bizAddressInput.value.length < 5) {
                 setDebug(`âœï¸ Dien Dia chi cong ty: ${acc.businessAddress}`, '#2563eb');
                 safeFill(bizAddressInput, acc.businessAddress);
+            }
+            return;
+        }
+    }
+})();
+
+
+========================================================================
+  6. SCRIPT 6: RELAY AUTO FILL & VERIFY ASSISTANT
+========================================================================
+// ==UserScript==
+// @name         Relay Auto Fill & Verify Assistant
+// @namespace    http://tampermonkey.net/
+// @version      1.0
+// @description  Tu dong dien thong tin dang ky tai khoan doanh nghiep Relay Financial tu dong bo local
+// @author       Antigravity AI
+// @match        https://app.relayfi.com/*
+// @grant        GM_xmlhttpRequest
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @connect      127.0.0.1
+// @connect      localhost
+// @run-at       document-end
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    let debugDiv = null;
+    function initDebug() {
+        if (debugDiv) return;
+        debugDiv = document.createElement('div');
+        debugDiv.style.position = 'fixed';
+        debugDiv.style.top = '10px';
+        debugDiv.style.right = '10px';
+        debugDiv.style.background = '#4c1d95';
+        debugDiv.style.color = 'white';
+        debugDiv.style.padding = '12px 16px';
+        debugDiv.style.borderRadius = '8px';
+        debugDiv.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';
+        debugDiv.style.zIndex = '9999999';
+        debugDiv.style.fontSize = '13px';
+        debugDiv.style.fontFamily = 'monospace';
+        debugDiv.style.lineHeight = '1.5';
+        debugDiv.style.maxWidth = '400px';
+        debugDiv.style.wordBreak = 'break-all';
+        debugDiv.innerHTML = 'ðŸ›ï¸ [Relay Assistant] Dang khoi dong...';
+        document.body.appendChild(debugDiv);
+    }
+
+    function setDebug(msg, color = '#4c1d95') {
+        if (!debugDiv) initDebug();
+        debugDiv.style.background = color;
+        debugDiv.innerHTML = 'ðŸ›ï¸ [Relay Assistant]<br>' + msg;
+    }
+
+    const API_CURRENT_ACCOUNT = 'http://127.0.0.1:3000/api/current-account';
+
+    function safeFill(element, value) {
+        if (!element) return false;
+        try {
+            element.focus();
+            const prototype = Object.getPrototypeOf(element);
+            const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+            
+            if (descriptor && descriptor.set) {
+                descriptor.set.call(element, value);
+            } else {
+                element.value = value;
+            }
+            
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+            element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: value }));
+            element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: value }));
+        } catch (e) {
+            console.error('[Tampermonkey] Loi safeFill:', e);
+            element.value = value;
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        return true;
+    }
+
+    function safeClick(element) {
+        if (!element) return false;
+        try {
+            element.focus();
+            const clickEvent = new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true,
+                view: window
+            });
+            element.dispatchEvent(clickEvent);
+            if (typeof element.click === 'function') {
+                element.click();
+            }
+        } catch (e) {
+            console.error('[Tampermonkey] Loi safeClick:', e);
+            element.click();
+        }
+        return true;
+    }
+
+    function makeRequest(url, method, data, callback) {
+        if (typeof GM_xmlhttpRequest !== 'undefined') {
+            GM_xmlhttpRequest({
+                method: method,
+                url: url,
+                headers: { "Content-Type": "application/json" },
+                data: data ? JSON.stringify(data) : null,
+                onload: function(res) { callback(null, res.responseText); },
+                onerror: function(err) {
+                    fetch(url, {
+                        method: method,
+                        headers: data ? { "Content-Type": "application/json" } : {},
+                        body: data ? JSON.stringify(data) : null
+                    })
+                    .then(r => r.text())
+                    .then(text => callback(null, text))
+                    .catch(e => callback(e, null));
+                }
+            });
+        }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        initDebug();
+        
+        const interval = setInterval(() => {
+            try {
+                makeRequest(API_CURRENT_ACCOUNT, "GET", null, function(err, responseText) {
+                    if (err) {
+                        setDebug('â³ Khong ket noi duoc voi Tool local...', '#be123c');
+                        return;
+                    }
+                    try {
+                        const resData = JSON.parse(responseText);
+                        if (resData.success && resData.account && resData.account.isRelay) {
+                            const acc = resData.account;
+                            setDebug(`Dong bo OK! ðŸš€<br>ðŸ¢ Doanh nghiep: ${acc.nameOrg}<br>ðŸ‘¤ Chu so huu: ${acc.fullName}`, '#16a34a');
+                            runStep(acc);
+                        } else {
+                            setDebug('â³ Vui long click [Vao Relay] tren giao dien de truyen thong tin...', '#475569');
+                        }
+                    } catch (e) {
+                        console.error('Loi parse account:', e);
+                    }
+                });
+            } catch (e) {
+                setDebug('Loi vong lap: ' + e.message, '#be123c');
+            }
+        }, 1500);
+    });
+
+    function runStep(acc) {
+        const path = window.location.pathname;
+
+        // 1. BUOC Táº O TÃ€I KHOáº¢N (REGISTER - Email & Password)
+        if (path.includes('/register') || path.includes('/signup')) {
+            const emailInput = document.querySelector('input[type="email"], input[name="email"], input[id*="email"]');
+            const passInput = document.querySelector('input[type="password"], input[name="password"], input[id*="password"]');
+
+            if (emailInput && emailInput.offsetWidth > 0 && acc.email) {
+                if (emailInput.value !== acc.email) {
+                    setDebug(`âœï¸ Dien Email dang ky: ${acc.email}`, '#2563eb');
+                    safeFill(emailInput, acc.email);
+                }
+            }
+
+            if (passInput && passInput.offsetWidth > 0 && acc.password) {
+                if (passInput.value !== acc.password) {
+                    setDebug(`âœï¸ Dien Mat khau ngau nhien...`, '#2563eb');
+                    safeFill(passInput, acc.password);
+                }
+            }
+            return;
+        }
+
+        // 2. BUOC DIEN THONG TIN CHI TIET DOANH NGHIEP (BUSINESS DETAILS)
+        // Kiem tra o nhap ten doanh nghiep
+        const orgInput = document.querySelector('input[name="legalBusinessName"], input[name="businessName"], input[placeholder*="Legal business name"]');
+        if (orgInput && orgInput.offsetWidth > 0) {
+            if (orgInput.value !== acc.nameOrg) {
+                setDebug(`âœï¸ Dien ten cong ty: ${acc.nameOrg}`, '#2563eb');
+                safeFill(orgInput, acc.nameOrg);
+            }
+
+            // Ma so thue doanh nghiep (EIN)
+            const einInput = document.querySelector('input[name="ein"], input[id*="ein"], input[placeholder*="EIN"]');
+            if (einInput && einInput.offsetWidth > 0 && einInput.value !== acc.ein) {
+                setDebug(`âœï¸ Dien EIN: ${acc.ein}`, '#2563eb');
+                safeFill(einInput, acc.ein);
+            }
+
+            // Dia chi doanh nghiep (Business Address)
+            const bizAddressInput = document.querySelector('input[placeholder*="Search for an address"], input[name*="address"], input[id*="address"]');
+            if (bizAddressInput && bizAddressInput.offsetWidth > 0 && bizAddressInput.value.length < 5) {
+                setDebug(`âœï¸ Dien Dia chi cong ty: ${acc.businessAddress}`, '#2563eb');
+                safeFill(bizAddressInput, acc.businessAddress);
+            }
+            return;
+        }
+
+        // 3. BUOC DIEN THONG TIN CA NHAN CHU SO HUU (OWNER DETAILS)
+        const firstNameInput = document.querySelector('input[name="firstName"], input[id="firstName"], input[placeholder*="First name"]');
+        const lastNameInput = document.querySelector('input[name="lastName"], input[id="lastName"], input[placeholder*="Last name"]');
+
+        if (firstNameInput && firstNameInput.offsetWidth > 0) {
+            const parts = acc.fullName.split(' ');
+            const firstName = parts[0] || '';
+            const lastName = parts.slice(1).join(' ') || '';
+
+            if (firstNameInput.value !== firstName) {
+                setDebug(`âœï¸ Dien First Name: ${firstName}`, '#2563eb');
+                safeFill(firstNameInput, firstName);
+            }
+            if (lastNameInput && lastNameInput.value !== lastName) {
+                setDebug(`âœï¸ Dien Last Name: ${lastName}`, '#2563eb');
+                safeFill(lastNameInput, lastName);
+            }
+
+            // Ngay sinh (Birthday Month, Day, Year)
+            const dobInput = acc.dob || ''; // Dang "Oct 20 1987"
+            if (dobInput) {
+                const partsDob = dobInput.split(' ');
+                if (partsDob.length === 3) {
+                    const months = { 'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06', 'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12' };
+                    const monthText = partsDob[0].toLowerCase().slice(0, 3);
+                    const monthNum = months[monthText] || '10';
+                    const dayNum = partsDob[1].replace(/[^0-9]/g, '').padStart(2, '0');
+                    const yearNum = partsDob[2].trim();
+
+                    const monthInput = document.querySelector('input[placeholder="MM"], input[name*="month"], input[id*="month"]');
+                    const dayInput = document.querySelector('input[placeholder="DD"], input[name*="day"], input[id*="day"]');
+                    const yearInput = document.querySelector('input[placeholder="YYYY"], input[name*="year"], input[id*="year"]');
+
+                    if (monthInput && monthInput.value !== monthNum) {
+                        setDebug(`âœï¸ Dien ngay sinh: ${monthNum}/${dayNum}/${yearNum}`, '#2563eb');
+                        safeFill(monthInput, monthNum);
+                    }
+                    if (dayInput && dayInput.value !== dayNum) {
+                        safeFill(dayInput, dayNum);
+                    }
+                    if (yearInput && yearInput.value !== yearNum) {
+                        safeFill(yearInput, yearNum);
+                    }
+                }
+            }
+
+            // So an sinh xa hoi (SSN)
+            const ssnInput = document.querySelector('input[name="ssn"], input[id*="ssn"], input[placeholder*="SSN"]');
+            if (ssnInput && ssnInput.offsetWidth > 0 && ssnInput.value !== acc.ssn) {
+                setDebug(`âœï¸ Dien SSN: ${acc.ssn}`, '#2563eb');
+                safeFill(ssnInput, acc.ssn);
+            }
+
+            // Dia chi nha rieng (Home Address)
+            const addressInput = document.querySelector('input[placeholder*="Search for an address"], input[name*="address"], input[id*="address"]');
+            if (addressInput && addressInput.offsetWidth > 0 && addressInput.value.length < 5) {
+                const fullPersonalAddress = `${acc.personalAddress}, ${acc.city}, ${acc.personalState} ${acc.zipcode}`;
+                setDebug(`âœï¸ Dien Dia chi rieng: ${fullPersonalAddress}`, '#2563eb');
+                safeFill(addressInput, fullPersonalAddress);
             }
             return;
         }

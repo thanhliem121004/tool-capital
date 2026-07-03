@@ -184,6 +184,72 @@ export function MercuryCard({ row, onUpdated, mailProvider, preferredDomain = 'r
     }
   };
 
+  const handleOpenRelay = async () => {
+    if (onActive) onActive(row.email || '');
+
+    // Đồng bộ thông tin đầy đủ của doanh nghiệp và cá nhân lên current-account
+    const accData = {
+      email: email || row.email || '',
+      password: password || row.password || '',
+      isRelay: true, // Tag nhận diện cho Script 6
+      nameOrg: row["Name Org"],
+      businessAddress: row["businessAddress"],
+      ein: row["EIN"],
+      businessState: row["businessState"],
+      fullName: row["Full name"],
+      ssn: row["SSN"],
+      dob: row["DOB(mm/dd/yyyy)"],
+      personalAddress: row["personalAddress"],
+      city: row["City"],
+      zipcode: row["Zipcode"],
+      personalState: row["personalState"],
+    };
+
+    try {
+      await fetch('/api/current-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(accData)
+      });
+    } catch (e) {
+      console.error('Lỗi đặt current-account cho Relay:', e);
+    }
+
+    // Mở trang đăng ký của Relay
+    const loginUrl = 'https://app.relayfi.com/register';
+
+    // Mở hòm thư ảo song song để lấy OTP kích hoạt gửi về
+    let recoveryMailboxUrl = '';
+    const activeMail = email || row.email || '';
+    if (activeMail) {
+      const domain = activeMail.split('@')[1]?.toLowerCase() || '';
+      const inboxesDomains = ['inboxes.com', 'dropjar.com', 'kapsule.info', 'getinbox.work', 'fivermail.com'];
+      const isSmv = domain === 'smvmail.com';
+      const isInboxes = inboxesDomains.some(d => domain.includes(d));
+      if (isSmv) {
+        recoveryMailboxUrl = `https://smvmail.com/email/${encodeURIComponent(activeMail)}`;
+      } else if (isInboxes) {
+        recoveryMailboxUrl = 'https://inboxes.com';
+      }
+    }
+
+    try {
+      const openRes = await fetch('/api/open-incognito', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: loginUrl, recoveryMailboxUrl })
+      });
+      const openData = await openRes.json();
+      if (!openData.success) {
+        window.open(loginUrl, '_blank');
+        if (recoveryMailboxUrl) window.open(recoveryMailboxUrl, '_blank');
+      }
+    } catch (e) {
+      console.error('Lỗi gọi API mở ẩn danh Relay:', e);
+      window.open(loginUrl, '_blank');
+    }
+  };
+
   const handleComplete = async () => {
     setLoadingComplete(true);
     setErr('');
@@ -294,28 +360,40 @@ export function MercuryCard({ row, onUpdated, mailProvider, preferredDomain = 'r
                 {loadingCreate ? '⏳ Đang tạo hòm thư...' : '✨ Tạo email & mật khẩu đăng ký'}
               </button>
             ) : (
-              <div className="flex gap-2">
-                <button
-                  onClick={handleOpenMercury}
-                  className="flex-1 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-1"
-                >
-                  🔑 Vào Mercury
-                </button>
-                <button
-                  onClick={handleComplete}
-                  disabled={loadingComplete}
-                  className="flex-1 py-2 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 disabled:bg-gray-300 transition-colors"
-                >
-                  {loadingComplete ? 'Saving...' : '✅ Hoàn thành'}
-                </button>
-                <button
-                  onClick={handleMarkError}
-                  disabled={loadingError}
-                  className="px-3 py-2 bg-red-100 text-red-700 text-xs font-bold rounded-lg hover:bg-red-200 disabled:bg-gray-300 transition-colors"
-                  title="Đánh dấu lỗi đăng ký"
-                >
-                  ❌ Lỗi
-                </button>
+              <div className="space-y-2">
+                {/* Hàng nút 1: Mở trình duyệt */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleOpenMercury}
+                    className="flex-1 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-1 shadow-sm"
+                  >
+                    🔑 Vào Mercury
+                  </button>
+                  <button
+                    onClick={handleOpenRelay}
+                    className="flex-1 py-2 bg-purple-600 text-white text-xs font-bold rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-1 shadow-sm"
+                  >
+                    🛍️ Vào Relay
+                  </button>
+                </div>
+                {/* Hàng nút 2: Xác nhận trạng thái */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleComplete}
+                    disabled={loadingComplete}
+                    className="flex-1 py-2 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors"
+                  >
+                    {loadingComplete ? 'Saving...' : '✅ Hoàn thành'}
+                  </button>
+                  <button
+                    onClick={handleMarkError}
+                    disabled={loadingError}
+                    className="px-3 py-2 bg-red-100 text-red-700 text-xs font-bold rounded-lg hover:bg-red-200 disabled:bg-gray-300 transition-colors"
+                    title="Đánh dấu lỗi đăng ký"
+                  >
+                    ❌ Lỗi
+                  </button>
+                </div>
               </div>
             )}
           </>
