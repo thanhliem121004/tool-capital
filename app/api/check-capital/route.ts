@@ -34,7 +34,15 @@ export async function POST(request: NextRequest) {
     // 2. Chạy lệnh WMIC để tắt sạch toàn bộ các tiến trình Chrome ẩn danh trước đó (chỉ nhắm vào tiến trình có cờ --incognito)
     const killCmd = "wmic process where \"name='chrome.exe' and commandline like '%--incognito%'\" call terminate";
     
-    exec(killCmd, () => {
+    exec(killCmd, (killErr, killStdout, killStderr) => {
+      if (killErr) {
+        console.error('[Check Capital] Lỗi thực thi lệnh wmic kill:', killErr);
+      }
+      if (killStderr) {
+        console.error('[Check Capital] Lỗi lệnh wmic kill (stderr):', killStderr);
+      }
+      console.log('[Check Capital] Kết quả lệnh wmic kill (stdout):', killStdout);
+
       // 3. Khởi chạy cửa sổ ẩn danh mới bằng Profile mặc định (để có sẵn các Extension của người dùng)
       const cmd = `start chrome.exe --incognito "${checkUrl}"`;
       
