@@ -573,6 +573,9 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
     setLoadingComplete(true);
     setErr('');
     try {
+      const isCurrentlyCapitalError = row.newMkCapital === 'SAI CAPITAL';
+      const finalMkCapital = isCurrentlyCapitalError ? 'SAI CAPITAL' : newMkCapital;
+
       const body: any = {
         sheetId,
         sheetName,
@@ -585,7 +588,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
       if (mode === 'capital') {
         body.email = row.email;
         body.newMkHotmail = newPassword;
-        body.newMkCapital = newMkCapital;
+        body.newMkCapital = finalMkCapital;
       }
 
       const res = await fetch('/api/complete-row', {
@@ -596,10 +599,19 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Lỗi cập nhật Sheet');
       
-      const updates: any = { isDone: true, recovery: generated };
+      const updates: any = { recovery: generated };
       if (mode === 'capital') {
         updates.newPassword = newPassword;
-        updates.newMkCapital = newMkCapital;
+        updates.newMkCapital = finalMkCapital;
+        if (isCurrentlyCapitalError) {
+          updates.isPasswordError = true;
+          updates.isDone = false;
+        } else {
+          updates.isDone = true;
+          updates.isPasswordError = false;
+        }
+      } else {
+        updates.isDone = true;
       }
       onUpdated(row.rowIndex, updates);
     } catch (e) {

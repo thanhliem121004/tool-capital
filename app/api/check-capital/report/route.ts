@@ -93,13 +93,16 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Nếu cột L trước đó đang chứa chữ lỗi, ta xóa nó đi để sẵn sàng hoạt động
+      // Nếu cột L hoặc N trước đó đang chứa chữ lỗi, ta xóa nó đi để sẵn sàng hoạt động
       const rowRes = await sheets.spreadsheets.values.get({
         spreadsheetId: sheetId,
-        range: `'${sheetName}'!L${rowIndex}:L${rowIndex}`,
+        range: `'${sheetName}'!L${rowIndex}:N${rowIndex}`,
       });
-      const oldVal = String(rowRes.data.values?.[0]?.[0] ?? '').trim();
-      if (oldVal.includes('SAI')) {
+      const rowVals = rowRes.data.values?.[0] || [];
+      const oldValL = String(rowVals[0] ?? '').trim();
+      const oldValN = String(rowVals[2] ?? '').trim();
+      
+      if (oldValL.includes('SAI')) {
         await sheets.spreadsheets.values.update({
           spreadsheetId: sheetId,
           range: `'${sheetName}'!L${rowIndex}`,
@@ -107,8 +110,25 @@ export async function POST(request: NextRequest) {
           requestBody: { values: [['']] },
         });
       }
+      if (oldValN.includes('SAI')) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: sheetId,
+          range: `'${sheetName}'!N${rowIndex}`,
+          valueInputOption: 'RAW',
+          requestBody: { values: [['']] },
+        });
+      }
     } else {
-      // Đăng nhập THẤT BẠI: Tô màu đỏ pastel và ghi "SAI CAPITAL" vào cột L
+      // Đăng nhập THẤT BẠI: Tô màu đỏ pastel và ghi "SAI CAPITAL" vào cột N
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: `'${sheetName}'!N${rowIndex}`,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [['SAI CAPITAL']],
+        },
+      });
+
       await sheets.spreadsheets.batchUpdate({
         spreadsheetId: sheetId,
         requestBody: {
@@ -131,16 +151,6 @@ export async function POST(request: NextRequest) {
               },
             },
           ],
-        },
-      });
-
-      // Ghi chữ "SAI CAPITAL" vào cột L
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: sheetId,
-        range: `'${sheetName}'!L${rowIndex}`,
-        valueInputOption: 'RAW',
-        requestBody: {
-          values: [['SAI CAPITAL']],
         },
       });
     }
