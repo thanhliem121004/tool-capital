@@ -30,8 +30,8 @@ export async function POST(request: NextRequest) {
     const base64Data = Buffer.from(JSON.stringify(accData)).toString('base64');
     const checkUrl = `https://capitaloneshopping.com/sign-in#check=${base64Data}`;
 
-    // 2. Chạy lệnh PowerShell để tắt các tiến trình Chrome ẩn danh trước đó để làm sạch session
-    const killCmd = `powershell -Command "Get-CimInstance Win32_Process -Filter \\"name = 'chrome.exe'\\" | Where-Object { $_.CommandLine -like '*--incognito*' } | ForEach-Object { Stop-Process $_.ProcessId -Force }"`;
+    // 2. Chạy lệnh PowerShell tương thích cao để tắt các tiến trình Chrome ẩn danh trước đó
+    const killCmd = "powershell -ExecutionPolicy Bypass -Command \"Get-WmiObject Win32_Process -Filter \\\"name='chrome.exe'\\\" | Where-Object { $_.CommandLine -like '*--incognito*' } | ForEach-Object { Stop-Process $_.ProcessId -Force }\"";
     
     exec(killCmd, () => {
       // 3. Khởi chạy cửa sổ ẩn danh mới hoàn toàn sạch session
