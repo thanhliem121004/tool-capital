@@ -45,7 +45,7 @@ export function useSheet(initialSheetId: string, initialSheetName = 'Sheet1', in
 
   const fetchRows = useCallback(async () => {
     if (!isReady || !sheetId) {
-      return;
+      return [];
     }
     setLoading(true);
     setError('');
@@ -59,11 +59,15 @@ export function useSheet(initialSheetId: string, initialSheetName = 'Sheet1', in
       if (!data.success) {
         setError(data.error || 'Không đọc được sheet (Vui lòng kiểm tra lại Tên Trang Tính)');
         setRows([]);
+        return [];
       } else {
-        setRows(data.rows ?? []);
+        const list = data.rows ?? [];
+        setRows(list);
+        return list;
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      return [];
     } finally {
       setLoading(false);
     }

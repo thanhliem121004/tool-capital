@@ -210,18 +210,42 @@ export default function Home() {
   const [autoNext, setAutoNext] = useState(false);
 
   const handleBulkCheckCapital = async () => {
+    setBulkChecking(true);
+    setBulkCheckStatusText('⏳ Đang đồng bộ dữ liệu mới nhất từ Google Sheet...');
+    
+    // Tải lại dữ liệu trực tiếp để tránh lệch state giữa các chế độ
+    const latestRows = await fetchRows();
+    
     const startRowVal = parseInt(startRowInput, 10) || 2;
-    const targets = filtered.filter(r => !r.isDone && !r.isPasswordError && r.rowIndex >= startRowVal);
+    
+    // Lọc dữ liệu mới nhất
+    const filteredLatest = latestRows.filter(r => {
+      if (statusFilter === 'done' && !r.isDone) return false;
+      if (statusFilter === 'not-done' && r.isDone) return false;
+      if (searchText) {
+        const q = searchText.toLowerCase();
+        const hay = (r.name + ' ' + r.email + ' ' +
+          (r.recovery || '') + ' ' + (r.oldRecovery || '')).toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    const targets = filteredLatest.filter(r => !r.isDone && !r.isPasswordError && r.rowIndex >= startRowVal);
+    
     if (targets.length === 0) {
+      setBulkChecking(false);
+      setBulkCheckStatusText('');
       alert(`Không có tài khoản nào có số dòng >= ${startRowVal} phù hợp cần check đăng nhập Capital!`);
       return;
     }
     const modeText = autoNext ? 'TỰ ĐỘNG LƯU & CUỐN CHIẾU' : 'chỉ kiểm tra hiển thị';
     if (!window.confirm(`Bạn có chắc chắn muốn tự động kiểm tra đăng nhập ngầm cho ${targets.length} tài khoản (từ dòng ${startRowVal} trở đi) chưa làm này với chế độ [${modeText}] không?`)) {
+      setBulkChecking(false);
+      setBulkCheckStatusText('');
       return;
     }
 
-    setBulkChecking(true);
     setBulkCheckProgress({ current: 0, total: targets.length });
     
     for (let i = 0; i < targets.length; i++) {
