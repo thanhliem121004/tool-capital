@@ -148,8 +148,9 @@
             if (err) {
                 console.error('[Script 3] Loi gui bao cao:', err);
             }
-            // Tu dong dong tab sau khi gui bao cao thanh cong
+            // Tu dong dong tab sau khi gui bao cao thanh cong (lừa opener de close tab)
             setTimeout(() => {
+                window.open('', '_self', '');
                 window.close();
             }, 1000);
         });
