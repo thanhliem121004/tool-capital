@@ -36,8 +36,10 @@ export function useSheet(initialSheetId: string, initialSheetName = 'Sheet1', in
   useEffect(() => {
     const savedId = localStorage.getItem('sheetId');
     const savedName = localStorage.getItem('sheetName');
+    const savedMode = localStorage.getItem('sheetMode') as 'default' | 'capital';
     if (savedId) setSheetId(savedId);
     if (savedName) setSheetName(savedName);
+    if (savedMode) setMode(savedMode);
     setIsReady(true);
   }, []);
 

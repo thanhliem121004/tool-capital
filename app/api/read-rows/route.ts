@@ -67,9 +67,9 @@ export async function POST(request: NextRequest) {
         // Bỏ qua hàng trống
         if (!email) continue;
 
-        const password = String(r?.[1] ?? '').trim();
-        const oldRecovery = String(r?.[2] ?? '').trim();
-        const mkCapital = String(r?.[3] ?? '').trim();
+        const password = String(r?.[1] ?? '').trim(); // Cột B (có thể lưu pass hotmail/khác)
+        const oldRecovery = String(r?.[2] ?? '').trim(); // Cột C: Mail khôi phục cũ
+        const mkCapital = String(r?.[3] ?? '').trim(); // Cột D: Mật khẩu Capital One
         
         const newPassword = String(r?.[11] ?? '').trim(); // Cột L: MK Hotmail mới
         const recovery = String(r?.[12] ?? '').trim();    // Cột M: Mail khôi phục mới
