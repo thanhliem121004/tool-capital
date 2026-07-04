@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exec } from 'child_process';
+import path from 'path';
 
 export const maxDuration = 30;
 
@@ -30,12 +31,14 @@ export async function POST(request: NextRequest) {
     const base64Data = Buffer.from(JSON.stringify(accData)).toString('base64');
     const checkUrl = `https://capitaloneshopping.com/sign-in#check=${base64Data}`;
 
-    // 2. Chạy lệnh PowerShell siêu an toàn để tắt cửa sổ Chrome ẩn danh trước đó (lọc chính xác tiêu đề có chứa ngoặc đơn Incognito hoặc Ẩn danh)
-    const killCmd = "powershell -ExecutionPolicy Bypass -Command \"Get-Process chrome -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like '*(Incognito)*' -or $_.MainWindowTitle -like '*(Ẩn danh)*' } | Stop-Process -Force\"";
+    const profilePath = path.join(process.cwd(), '.chrome-profile');
+
+    // 2. Chạy lệnh PowerShell siêu an toàn để tắt các tiến trình Chrome ẩn danh của tool trước đó (lọc theo profile biệt lập)
+    const killCmd = `powershell -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process -Filter \\"name = 'chrome.exe'\\" | Where-Object { $_.CommandLine -like '*.chrome-profile*' } | ForEach-Object { Stop-Process $_.ProcessId -Force }"`;
     
     exec(killCmd, () => {
-      // 3. Khởi chạy cửa sổ ẩn danh mới sạch session
-      const cmd = `start chrome.exe --incognito "${checkUrl}"`;
+      // 3. Khởi chạy cửa sổ ẩn danh mới hoàn toàn sạch session và độc lập với Chrome thường
+      const cmd = `start chrome.exe --incognito --user-data-dir="${profilePath}" "${checkUrl}"`;
       
       exec(cmd, (err) => {
         if (err) {
