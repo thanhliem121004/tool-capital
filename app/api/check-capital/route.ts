@@ -31,8 +31,8 @@ export async function POST(request: NextRequest) {
     const base64Data = Buffer.from(JSON.stringify(accData)).toString('base64');
     const checkUrl = `https://capitaloneshopping.com/sign-in#check=${base64Data}`;
 
-    // 2. Chạy lệnh PowerShell gửi phím tắt Alt+F4 siêu an toàn để tắt cửa sổ Chrome ẩn danh cũ (chỉ nhắm vào tiêu đề Incognito hoặc Ẩn danh)
-    const killCmd = `powershell -ExecutionPolicy Bypass -Command "$wshell = New-Object -ComObject wscript.shell; if ($wshell.AppActivate('Incognito')) { $wshell.SendKeys('%{F4}') } elseif ($wshell.AppActivate('Ẩn danh')) { $wshell.SendKeys('%{F4}') }"`;
+    // 2. Chạy lệnh WMIC để tắt sạch toàn bộ các tiến trình Chrome ẩn danh trước đó (chỉ nhắm vào tiến trình có cờ --incognito)
+    const killCmd = "wmic process where \"name='chrome.exe' and commandline like '%--incognito%'\" call terminate";
     
     exec(killCmd, () => {
       // 3. Khởi chạy cửa sổ ẩn danh mới bằng Profile mặc định (để có sẵn các Extension của người dùng)
