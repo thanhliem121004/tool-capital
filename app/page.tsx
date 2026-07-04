@@ -219,7 +219,7 @@ export default function Home() {
     const startRowVal = parseInt(startRowInput, 10) || 2;
     
     // Lọc dữ liệu mới nhất
-    const filteredLatest = latestRows.filter(r => {
+    const filteredLatest = latestRows.filter((r: any) => {
       if (statusFilter === 'done' && !r.isDone) return false;
       if (statusFilter === 'not-done' && r.isDone) return false;
       if (searchText) {
@@ -231,7 +231,7 @@ export default function Home() {
       return true;
     });
 
-    const targets = filteredLatest.filter(r => !r.isDone && !r.isPasswordError && r.rowIndex >= startRowVal);
+    const targets = filteredLatest.filter((r: any) => !r.isDone && !r.isPasswordError && r.rowIndex >= startRowVal);
     
     if (targets.length === 0) {
       setBulkChecking(false);
