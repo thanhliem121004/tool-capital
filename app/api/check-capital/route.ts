@@ -30,20 +30,15 @@ export async function POST(request: NextRequest) {
     const base64Data = Buffer.from(JSON.stringify(accData)).toString('base64');
     const checkUrl = `https://capitaloneshopping.com/sign-in#check=${base64Data}`;
 
-    // 2. Chạy lệnh PowerShell nâng cao để tắt các tiến trình Chrome ẩn danh trước đó (theo tiêu đề cửa sổ và dòng lệnh)
-    const killCmd = "powershell -ExecutionPolicy Bypass -Command \"Get-Process chrome -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like '*Incognito*' -or $_.MainWindowTitle -like '*Ẩn danh*' -or $_.MainWindowTitle -like '*Capital One*' } | Stop-Process -Force; Get-WmiObject Win32_Process -Filter \\\"name='chrome.exe'\\\" | Where-Object { $_.CommandLine -like '*--incognito*' } | ForEach-Object { Stop-Process $_.ProcessId -Force }\"";
+    // 2. Khởi chạy cửa sổ ẩn danh mới sạch session (Việc đóng tab cũ đã được xử lý tự động bằng JS trong Script 3)
+    const cmd = `start chrome.exe --incognito "${checkUrl}"`;
     
-    exec(killCmd, () => {
-      // 3. Khởi chạy cửa sổ ẩn danh mới hoàn toàn sạch session
-      const cmd = `start chrome.exe --incognito "${checkUrl}"`;
-      
-      exec(cmd, (err) => {
-        if (err) {
-          console.error('[Check Capital] Lỗi khởi chạy chrome.exe qua cmd:', err);
-          // Fallback: Mở bằng link mặc định nếu lệnh Chrome lỗi
-          exec(`start "" "${checkUrl}"`);
-        }
-      });
+    exec(cmd, (err) => {
+      if (err) {
+        console.error('[Check Capital] Lỗi khởi chạy chrome.exe qua cmd:', err);
+        // Fallback: Mở bằng link mặc định nếu lệnh Chrome lỗi
+        exec(`start "" "${checkUrl}"`);
+      }
     });
 
     return NextResponse.json({ 
