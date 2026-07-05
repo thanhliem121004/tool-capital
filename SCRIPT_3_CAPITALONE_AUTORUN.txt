@@ -52,30 +52,42 @@
     const API_CURRENT_ACCOUNT = 'http://127.0.0.1:3000/api/current-account';
     const API_REPORT_RESULT = 'http://127.0.0.1:3000/api/check-capital/report';
 
-    function safeFill(element, value) {
+    async function safeFill(element, value) {
         if (!element) return false;
+        if (element.getAttribute('data-typing') === 'true') return true;
+        element.setAttribute('data-typing', 'true');
+        
         try {
             element.focus();
             const prototype = Object.getPrototypeOf(element);
             const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+            let setter = descriptor && descriptor.set ? descriptor.set : function(v) { this.value = v; };
 
-            if (descriptor && descriptor.set) {
-                descriptor.set.call(element, value);
-            } else {
-                element.value = value;
-            }
-
+            setter.call(element, '');
             element.dispatchEvent(new Event('input', { bubbles: true }));
+
+            for (let i = 0; i < value.length; i++) {
+                const char = value[i];
+                const currentVal = element.value || '';
+                setter.call(element, currentVal + char);
+
+                element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: char }));
+                element.dispatchEvent(new KeyboardEvent('keypress', { bubbles: true, key: char }));
+                element.dispatchEvent(new Event('input', { bubbles: true }));
+                element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: char }));
+
+                await new Promise(r => setTimeout(r, 15 + Math.random() * 50));
+            }
             element.dispatchEvent(new Event('change', { bubbles: true }));
             element.dispatchEvent(new Event('blur', { bubbles: true }));
             element.dispatchEvent(new Event('focus', { bubbles: true }));
-            element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: value }));
-            element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: value }));
         } catch (e) {
             console.error('[Tampermonkey] Loi safeFill:', e);
             element.value = value;
             element.dispatchEvent(new Event('input', { bubbles: true }));
             element.dispatchEvent(new Event('change', { bubbles: true }));
+        } finally {
+            element.removeAttribute('data-typing');
         }
         return true;
     }
