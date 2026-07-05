@@ -52,43 +52,30 @@
     const API_CURRENT_ACCOUNT = 'http://127.0.0.1:3000/api/current-account';
     const API_REPORT_RESULT = 'http://127.0.0.1:3000/api/check-capital/report';
 
-    async function safeFill(element, value) {
+    function safeFill(element, value) {
         if (!element) return false;
-        if (element.getAttribute('data-typing') === 'true') return true;
-        element.setAttribute('data-typing', 'true');
-        
         try {
             element.focus();
             const prototype = Object.getPrototypeOf(element);
             const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
-            let setter = descriptor && descriptor.set ? descriptor.set : function(v) { this.value = v; };
 
-            setter.call(element, '');
-            element.dispatchEvent(new Event('input', { bubbles: true }));
-
-            let accum = '';
-            for (let i = 0; i < value.length; i++) {
-                const char = value[i];
-                accum += char;
-                setter.call(element, accum);
-
-                element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: char }));
-                element.dispatchEvent(new KeyboardEvent('keypress', { bubbles: true, key: char }));
-                element.dispatchEvent(new Event('input', { bubbles: true }));
-                element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: char }));
-
-                await new Promise(r => setTimeout(r, 15 + Math.random() * 50));
+            if (descriptor && descriptor.set) {
+                descriptor.set.call(element, value);
+            } else {
+                element.value = value;
             }
+
+            element.dispatchEvent(new Event('input', { bubbles: true }));
             element.dispatchEvent(new Event('change', { bubbles: true }));
             element.dispatchEvent(new Event('blur', { bubbles: true }));
             element.dispatchEvent(new Event('focus', { bubbles: true }));
+            element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: value }));
+            element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: value }));
         } catch (e) {
             console.error('[Tampermonkey] Loi safeFill:', e);
             element.value = value;
             element.dispatchEvent(new Event('input', { bubbles: true }));
             element.dispatchEvent(new Event('change', { bubbles: true }));
-        } finally {
-            element.removeAttribute('data-typing');
         }
         return true;
     }
@@ -99,8 +86,7 @@
             element.focus();
             const clickEvent = new MouseEvent('click', {
                 bubbles: true,
-                cancelable: true,
-                view: window
+                cancelable: true
             });
             element.dispatchEvent(clickEvent);
             if (typeof element.click === 'function') {
@@ -255,7 +241,7 @@
 
         // Kiem tra loi dang nhap truoc
         const bodyText = (document.body.innerText || '').toLowerCase();
-        const isWrongCredsText = bodyText.includes('incorrect email or password') || 
+        const isWrongCredsText = bodyText.includes('incorrect email or password') ||
                                  bodyText.includes("don't recognize that email or password") ||
                                  bodyText.includes("incorrect password") ||
                                  (bodyText.includes("don't recognize") && (bodyText.includes("email") || bodyText.includes("password"))) ||
@@ -279,31 +265,77 @@
             // Luong doi mat khau
             const currentPassInput = document.getElementById('id_currentPassword') || document.querySelector('input[name="currentPassword"]');
             const newPassInput = document.getElementById('id_newPassword') || document.querySelector('input[name="newPassword"]');
+
             if (currentPassInput && currentPassInput.offsetWidth > 0 && newPassInput && newPassInput.offsetWidth > 0) {
-                // Điền mật khẩu (chỉ điền nếu chưa đúng)
-                if (currentPassInput.value !== acc.mkCapital) {
-                    safeFill(currentPassInput, acc.mkCapital);
+                // Điền mật khẩu
+                safeFill(currentPassInput, acc.mkCapital);
+                safeFill(newPassInput, acc.newMkCapital);
+
+                // Tìm nút "Change Password" bằng interval để chắc chắn bắt được khi React render xong
+                if (!window._saveBtnInterval) {
+                    window._saveBtnInterval = setInterval(() => {
+                        // Bỏ qua nếu form đã đóng (input biến mất)
+                        const currentInput = document.getElementById('id_currentPassword') || document.querySelector('input[name="currentPassword"]');
+                        if (!currentInput || currentInput.offsetWidth === 0) {
+                            clearInterval(window._saveBtnInterval);
+                            window._saveBtnInterval = null;
+                            return;
+                        }
+
+                        // Cách 1: Tìm bằng class đặc trưng
+                        let saveBtn = document.querySelector('button.primary-btn-large, .primary-btn-large');
+
+                        // Cách 2: Tìm tất cả các thẻ và lọc theo text
+                        if (!saveBtn || saveBtn.offsetWidth === 0) {
+                            const elements = Array.from(document.querySelectorAll('*'));
+                            saveBtn = elements.find(el => {
+                                if (el.offsetWidth === 0) return false;
+                                // Bỏ qua body, html, form, div bọc ngoài quá lớn
+                                if (['BODY', 'HTML', 'FORM'].includes(el.tagName)) return false;
+                                if (el.children.length > 2) return false; // Thẻ chứa chữ thường không có quá nhiều thẻ con
+
+                                const txt = (el.textContent || el.value || '').trim().toLowerCase();
+                                return txt === 'change password';
+                            });
+                        }
+
+                        if (saveBtn) {
+                            setDebug('💾 Click [Change Password]...', '#16a34a');
+                            const target = saveBtn.closest('button') || saveBtn;
+                            const rect = target.getBoundingClientRect();
+                            if (rect.width > 0 && rect.height > 0) {
+                                const cx = rect.left + rect.width / 2;
+                                const cy = rect.top + rect.height / 2;
+                                const opts = { bubbles: true, cancelable: true, clientX: cx, clientY: cy };
+                                target.focus();
+                                target.dispatchEvent(new PointerEvent('pointerdown', opts));
+                                target.dispatchEvent(new MouseEvent('mousedown', opts));
+                                target.dispatchEvent(new PointerEvent('pointerup', opts));
+                                target.dispatchEvent(new MouseEvent('mouseup', opts));
+                                target.dispatchEvent(new MouseEvent('click', opts));
+                                target.click();
+                            } else {
+                                target.click();
+                            }
+
+                            clearInterval(window._saveBtnInterval);
+                            window._saveBtnInterval = null;
+                        }
+                    }, 500);
                 }
-                if (newPassInput.value !== acc.newMkCapital) {
-                    safeFill(newPassInput, acc.newMkCapital);
-                }
-                
-                // Đã bỏ tính năng tự động click Change Password theo yêu cầu của user
-                setDebug('💾 Đã điền xong mật khẩu. Vui lòng tự nhấn [Change Password]...', '#16a34a');
-            }
-                
+
                 // Tránh trùng lặp interval kiểm tra đổi mật khẩu thành công
                 if (!window.checkSuccessActive) {
                     window.checkSuccessActive = true;
                     let checkCount = 0;
                     const checkSuccessInterval = setInterval(() => {
                         checkCount++;
-                        
+
                         // 1. Kiểm tra xem có thông báo lỗi nào xuất hiện không
                         const bodyText = document.body.innerText.toLowerCase();
-                        const hasError = bodyText.includes('must contain') || 
+                        const hasError = bodyText.includes('must contain') ||
                                          bodyText.includes('incorrect current password');
-                                         
+
                         if (hasError && checkCount < 6) {
                             clearInterval(checkSuccessInterval);
                             window.checkSuccessActive = false;
@@ -397,10 +429,7 @@
                 });
             }
 
-            const isEmailFilled = !emailInput || emailInput.value === acc.email;
-            const isPassFilled = !passInput || (acc.mkCapital && passInput.value === acc.mkCapital);
-
-            if (loginBtn && isEmailFilled && isPassFilled) {
+            if (loginBtn && emailInput && emailInput.value.length > 0 && (passInput ? passInput.value.length > 0 : true)) {
                 setDebug('Click [Sign In/Continue]...', '#16a34a');
                 safeClick(loginBtn);
                 return;
@@ -408,7 +437,25 @@
             return;
         }
 
-        // 3. KIEM TRA SIGN IN LINK DE CLICK VAO
+        // 3. KIEM TRA LOGGED IN (USER MENU) DE CHUYEN HUONG
+        const hasUserMenu = document.querySelector('[data-testid="account-nav-menu"]') ||
+                            document.getElementById('radix-_r_0_') ||
+                            Array.from(document.querySelectorAll('button')).some(btn => {
+                                return btn.getAttribute('aria-haspopup') === 'menu' || btn.getAttribute('aria-expanded') !== null;
+                            });
+
+        if (hasUserMenu || (path !== '/sign-in' && !path.includes('/sign-in') && !path.includes('/auth/signin'))) {
+            clearInterval(interval);
+            if (isAutoCheck) {
+                reportResult(acc, 'ok');
+            } else {
+                setDebug('Dang nhap thanh cong! Dang chuyen huong sang trang Profile...', '#16a34a');
+                window.location.href = 'https://capitaloneshopping.com/account-settings/profile';
+            }
+            return;
+        }
+
+        // 4. KIEM TRA SIGN IN LINK DE CLICK VAO
         const signInLink = Array.from(document.querySelectorAll('a, button')).find(el => {
             const txt = (el.textContent || '').trim().toLowerCase();
             const href = el.getAttribute('href') || '';
@@ -419,24 +466,6 @@
         if (signInLink && signInLink.offsetWidth > 0) {
             setDebug('Click chuyen huong den trang [Sign In]...', '#0284c7');
             safeClick(signInLink);
-            return;
-        }
-
-        // 4. KIEM TRA LOGGED IN (USER MENU) DE CHUYEN HUONG
-        const hasUserMenu = document.querySelector('[data-testid="account-nav-menu"]') ||
-                            document.getElementById('radix-_r_0_') ||
-                            Array.from(document.querySelectorAll('button')).some(btn => {
-                                return btn.getAttribute('aria-haspopup') === 'menu' || btn.getAttribute('aria-expanded') !== null;
-                            });
-
-        if (hasUserMenu) {
-            clearInterval(interval);
-            if (isAutoCheck) {
-                reportResult(acc, 'ok');
-            } else {
-                setDebug('Dang nhap thanh cong! Dang chuyen huong sang trang Profile...', '#16a34a');
-                window.location.href = 'https://capitaloneshopping.com/account-settings/profile';
-            }
             return;
         }
     }

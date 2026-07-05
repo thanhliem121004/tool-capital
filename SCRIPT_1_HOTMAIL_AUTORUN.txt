@@ -50,42 +50,28 @@
     const API_OTP_BRIDGE = 'http://127.0.0.1:3000/api/otp-bridge';
     const API_CURRENT_ACCOUNT = 'http://127.0.0.1:3000/api/current-account';
 
-    async function safeFill(element, value) {
+    function safeFill(element, value) {
         if (!element) return false;
-        if (element.getAttribute('data-typing') === 'true') return true;
-        element.setAttribute('data-typing', 'true');
-        
         try {
             element.focus();
             const prototype = Object.getPrototypeOf(element);
             const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
-            let setter = descriptor && descriptor.set ? descriptor.set : function(v) { this.value = v; };
 
-            setter.call(element, '');
-            element.dispatchEvent(new Event('input', { bubbles: true }));
-
-            let accum = '';
-            for (let i = 0; i < value.length; i++) {
-                const char = value[i];
-                accum += char;
-                setter.call(element, accum);
-
-                element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: char }));
-                element.dispatchEvent(new KeyboardEvent('keypress', { bubbles: true, key: char }));
-                element.dispatchEvent(new Event('input', { bubbles: true }));
-                element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: char }));
-
-                // Delay từ 15ms đến 65ms mỗi ký tự (gõ như người)
-                await new Promise(r => setTimeout(r, 15 + Math.random() * 50));
+            if (descriptor && descriptor.set) {
+                descriptor.set.call(element, value);
+            } else {
+                element.value = value;
             }
+
+            element.dispatchEvent(new Event('input', { bubbles: true }));
             element.dispatchEvent(new Event('change', { bubbles: true }));
+            element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: value }));
+            element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: value }));
         } catch (e) {
             console.error('[Tampermonkey] Lỗi safeFill:', e);
             element.value = value;
             element.dispatchEvent(new Event('input', { bubbles: true }));
             element.dispatchEvent(new Event('change', { bubbles: true }));
-        } finally {
-            element.removeAttribute('data-typing');
         }
         return true;
     }
@@ -396,7 +382,7 @@
         }
 
         // Xử lý màn hình "Xác minh danh tính của bạn" (Proof Selection) - click vào Tile chọn email khôi phục
-        const isIdentityPage = document.body.innerText.includes('Xác minh danh tính') || 
+        const isIdentityPage = document.body.innerText.includes('Xác minh danh tính') ||
                                document.body.innerText.includes('Verify your identity') ||
                                document.body.innerText.includes('Xác thực danh tính') ||
                                document.querySelector('#idDiv_SAOTCS_ProofList') !== null;
@@ -405,8 +391,8 @@
             const proofTile = Array.from(document.querySelectorAll('.tile-layout, .tile, #idDiv_SAOTCS_ProofList .tile, [id*="ProofList"]')).find(el => {
                 if (el.offsetWidth === 0) return false;
                 const txt = (el.textContent || '').trim().toLowerCase();
-                return txt.includes('gửi email đến') || 
-                       txt.includes('email to') || 
+                return txt.includes('gửi email đến') ||
+                       txt.includes('email to') ||
                        (txt.includes('@') && txt.includes('*') && (txt.includes('email') || txt.includes('gửi') || txt.includes('gửi email')));
             });
             if (proofTile) {
@@ -417,12 +403,10 @@
         }
 
         const kmsiTitle = document.querySelector('#kmsiTitle, .kmsi');
-        const declineBtn = document.querySelector('#declineButton');
-        
-        // Chỉ kích hoạt nếu thật sự có kmsiTitle hoặc declineButton, không dùng idBtn_Back để check vì nó trùng với nút Back ở trang nhập OTP
+        const declineBtn = document.querySelector('#declineButton, #idBtn_Back');
         if (kmsiTitle || declineBtn) {
             // Click "Không" (Don't stay signed in)
-            const noBtn = document.querySelector('#declineButton, #idBtn_Back') ||
+            const noBtn = declineBtn ||
                 Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a, div')).find(el => {
                     if (el.offsetWidth === 0) return false;
                     const txt = (el.textContent || el.value || '').trim().toLowerCase();
