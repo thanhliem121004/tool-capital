@@ -187,7 +187,7 @@
             const otp = matches.find(m => m !== '707070');
             if (otp) {
                 const lowerText = pageText.toLowerCase();
-                const isMicrosoft = lowerText.includes('microsoft') || lowerText.includes('ma bao mat') || lowerText.includes('security code');
+                const isMicrosoft = lowerText.includes('microsoft') || lowerText.includes('ma bao mat') || lowerText.includes('security code') || lowerText.includes('mã bảo mật');
                 if (isMicrosoft) {
                     return otp;
                 }
@@ -356,7 +356,11 @@
                     const docs = json.data?.docs || json.data?.data?.docs || json.docs || [];
                     for (const doc of docs) {
                         const subject = (doc.subject || '').toLowerCase();
-                        if (subject.includes('microsoft') || (doc.text && doc.text.toLowerCase().includes('microsoft')) || (doc.html && doc.html.toLowerCase().includes('microsoft'))) {
+                        const isMatch = subject.includes('microsoft') || subject.includes('ma bao mat') || subject.includes('mã bảo mật') || 
+                                        (doc.text && (doc.text.toLowerCase().includes('microsoft') || doc.text.toLowerCase().includes('mã bảo mật'))) || 
+                                        (doc.html && (doc.html.toLowerCase().includes('microsoft') || doc.html.toLowerCase().includes('mã bảo mật')));
+                        
+                        if (isMatch) {
                             const otp = extractOtpFromHtml(doc.html, doc.text);
                             if (otp) {
                                 setDebug(`Phat hien OTP SMVmail: ${otp}`, '#22c55e');
@@ -374,7 +378,12 @@
                 try {
                     const data = JSON.parse(responseText);
                     const messages = data.msgs || [];
-                    const targetMsg = messages.find(msg => msg.f && msg.f.toLowerCase().includes('microsoft'));
+                    const targetMsg = messages.find(msg => {
+                        const sender = (msg.f || '').toLowerCase();
+                        const subj = (msg.s || '').toLowerCase();
+                        return sender.includes('microsoft') || subj.includes('microsoft') || subj.includes('ma bao mat') || subj.includes('mã bảo mật') || subj.includes('security code');
+                    });
+                    
                     if (targetMsg) {
                         const bodyUrl = `https://inboxes.com/api/v2/message/${encodeURIComponent(targetMsg.uid)}`;
                         makeRequest(bodyUrl, "GET", null, function(err, bodyResponseText) {
@@ -436,11 +445,12 @@
                                 const txt = (el.innerText || el.textContent || '').toLowerCase();
                                 if (txt.includes('microsoft') || txt.includes('ma bao mat') || txt.includes('security code') || txt.includes('mã bảo mật')) {
                                     // Kiểm tra xem phần tử này có phải là thẻ click được không
-                                    if (el.tagName === 'A' || el.tagName === 'TR' || el.tagName === 'LI' || 
+                                    if (el.tagName === 'A' || el.tagName === 'TR' || el.tagName === 'LI' || el.tagName === 'TD' || 
                                         el.classList.contains('cursor-pointer') || 
                                         getComputedStyle(el).cursor === 'pointer' || 
                                         el.getAttribute('role') === 'row' || 
-                                        el.getAttribute('role') === 'button') {
+                                        el.getAttribute('role') === 'button' ||
+                                        el.getAttribute('role') === 'cell') {
                                         targetRow = el;
                                         break; // Đã tìm thấy phần tử sâu nhất hợp lệ
                                     }
@@ -448,24 +458,15 @@
                             }
                             
                             if (targetRow) {
-                                setDebug('🎯 Click mo thu Microsoft...', '#0284c7');
-                                const target = targetRow;
+                                const debugClass = targetRow.className ? `.${targetRow.className.replace(/ /g, '.')}` : '';
+                                setDebug(`🎯 Click mo thu Microsoft: <${targetRow.tagName.toLowerCase()}${debugClass}>...`, '#0284c7');
                                 
-                                const rect = target.getBoundingClientRect();
-                                if (rect.width > 0 && rect.height > 0) {
-                                    const cx = rect.left + rect.width / 2;
-                                    const cy = rect.top + rect.height / 2;
-                                    const opts = { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy };
-                                    target.focus();
-                                    target.dispatchEvent(new PointerEvent('pointerdown', opts));
-                                    target.dispatchEvent(new MouseEvent('mousedown', opts));
-                                    target.dispatchEvent(new PointerEvent('pointerup', opts));
-                                    target.dispatchEvent(new MouseEvent('mouseup', opts));
-                                    target.dispatchEvent(new MouseEvent('click', opts));
-                                    target.click();
-                                } else {
-                                    target.click();
-                                }
+                                // Dùng hàm safeClick đã được tối ưu thay vì click thủ công
+                                safeClick(targetRow);
+                                // Click thêm thẻ a bên trong nếu có (đề phòng)
+                                const link = targetRow.querySelector('a');
+                                if (link) safeClick(link);
+                                
                                 return;
                             }
                         }
