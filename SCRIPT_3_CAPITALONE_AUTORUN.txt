@@ -408,25 +408,7 @@
             return;
         }
 
-        // 3. KIEM TRA LOGGED IN (USER MENU) DE CHUYEN HUONG
-        const hasUserMenu = document.querySelector('[data-testid="account-nav-menu"]') ||
-                            document.getElementById('radix-_r_0_') ||
-                            Array.from(document.querySelectorAll('button')).some(btn => {
-                                return btn.getAttribute('aria-haspopup') === 'menu' || btn.getAttribute('aria-expanded') !== null;
-                            });
-
-        if (hasUserMenu || (path !== '/sign-in' && !path.includes('/sign-in') && !path.includes('/auth/signin'))) {
-            clearInterval(interval);
-            if (isAutoCheck) {
-                reportResult(acc, 'ok');
-            } else {
-                setDebug('Dang nhap thanh cong! Dang chuyen huong sang trang Profile...', '#16a34a');
-                window.location.href = 'https://capitaloneshopping.com/account-settings/profile';
-            }
-            return;
-        }
-
-        // 4. KIEM TRA SIGN IN LINK DE CLICK VAO
+        // 3. KIEM TRA SIGN IN LINK DE CLICK VAO
         const signInLink = Array.from(document.querySelectorAll('a, button')).find(el => {
             const txt = (el.textContent || '').trim().toLowerCase();
             const href = el.getAttribute('href') || '';
@@ -437,6 +419,24 @@
         if (signInLink && signInLink.offsetWidth > 0) {
             setDebug('Click chuyen huong den trang [Sign In]...', '#0284c7');
             safeClick(signInLink);
+            return;
+        }
+
+        // 4. KIEM TRA LOGGED IN (USER MENU) DE CHUYEN HUONG
+        const hasUserMenu = document.querySelector('[data-testid="account-nav-menu"]') ||
+                            document.getElementById('radix-_r_0_') ||
+                            Array.from(document.querySelectorAll('button')).some(btn => {
+                                return btn.getAttribute('aria-haspopup') === 'menu' || btn.getAttribute('aria-expanded') !== null;
+                            });
+
+        if (hasUserMenu) {
+            clearInterval(interval);
+            if (isAutoCheck) {
+                reportResult(acc, 'ok');
+            } else {
+                setDebug('Dang nhap thanh cong! Dang chuyen huong sang trang Profile...', '#16a34a');
+                window.location.href = 'https://capitaloneshopping.com/account-settings/profile';
+            }
             return;
         }
     }
