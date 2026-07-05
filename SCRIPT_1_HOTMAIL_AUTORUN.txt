@@ -403,10 +403,12 @@
         }
 
         const kmsiTitle = document.querySelector('#kmsiTitle, .kmsi');
-        const declineBtn = document.querySelector('#declineButton, #idBtn_Back');
+        const declineBtn = document.querySelector('#declineButton');
+        
+        // Chỉ kích hoạt nếu thật sự có kmsiTitle hoặc declineButton, không dùng idBtn_Back để check vì nó trùng với nút Back ở trang nhập OTP
         if (kmsiTitle || declineBtn) {
             // Click "Không" (Don't stay signed in)
-            const noBtn = declineBtn ||
+            const noBtn = document.querySelector('#declineButton, #idBtn_Back') ||
                 Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a, div')).find(el => {
                     if (el.offsetWidth === 0) return false;
                     const txt = (el.textContent || el.value || '').trim().toLowerCase();
