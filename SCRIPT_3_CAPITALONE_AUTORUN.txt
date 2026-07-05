@@ -291,35 +291,39 @@
                     if (saveBtn) {
                         setDebug('💾 Click [Save] luu mat khau moi...', '#16a34a');
                         safeClick(saveBtn);
-                        
-                        // Đợi đổi mật khẩu thành công thật sự
-                        let checkCount = 0;
-                        const checkSuccessInterval = setInterval(() => {
-                            checkCount++;
-                            const bodyText = document.body.innerText.toLowerCase();
-                            
-                            // 1. Kiểm tra xem có thông báo lỗi nào xuất hiện không
-                            const hasError = bodyText.includes('must contain') || 
-                                             bodyText.includes('incorrect current password');
-                                             
-                            if (hasError && checkCount < 6) {
-                                // Nếu có lỗi nhập liệu, dừng check
-                                clearInterval(checkSuccessInterval);
-                                setDebug('❌ Sai mật khẩu hiện tại hoặc mật khẩu mới không đúng yêu cầu!', '#be123c');
-                                return;
-                            }
-
-                            // 2. Kiểm tra xem các ô nhập mật khẩu đã thực sự biến mất khỏi màn hình (form đóng lại)
-                            const currentInput = document.getElementById('id_currentPassword') || document.querySelector('input[name="currentPassword"]');
-                            const isInputsGone = !currentInput || currentInput.offsetWidth === 0;
-
-                            if (isInputsGone || checkCount >= 16) { // Chờ tối đa 8 giây (16 * 500ms)
-                                clearInterval(checkSuccessInterval);
-                                setDebug('🎉 Đổi mật khẩu Capital thành công!', '#16a34a');
-                                reportResult(acc, 'ok');
-                            }
-                        }, 500);
                     }
+                }
+                
+                // Tránh trùng lặp interval kiểm tra đổi mật khẩu thành công
+                if (!window.checkSuccessActive) {
+                    window.checkSuccessActive = true;
+                    let checkCount = 0;
+                    const checkSuccessInterval = setInterval(() => {
+                        checkCount++;
+                        
+                        // 1. Kiểm tra xem có thông báo lỗi nào xuất hiện không
+                        const bodyText = document.body.innerText.toLowerCase();
+                        const hasError = bodyText.includes('must contain') || 
+                                         bodyText.includes('incorrect current password');
+                                         
+                        if (hasError && checkCount < 6) {
+                            clearInterval(checkSuccessInterval);
+                            window.checkSuccessActive = false;
+                            setDebug('❌ Sai mật khẩu hiện tại hoặc mật khẩu mới không đúng yêu cầu!', '#be123c');
+                            return;
+                        }
+
+                        // 2. Kiểm tra xem các ô nhập mật khẩu đã thực sự biến mất khỏi màn hình (form đóng lại)
+                        const currentInput = document.getElementById('id_currentPassword') || document.querySelector('input[name="currentPassword"]');
+                        const isInputsGone = !currentInput || currentInput.offsetWidth === 0;
+
+                        if (isInputsGone || checkCount >= 12) { // Chờ tối đa 18 giây (12 * 1500ms)
+                            clearInterval(checkSuccessInterval);
+                            window.checkSuccessActive = false;
+                            setDebug('🎉 Đổi mật khẩu Capital thành công!', '#16a34a');
+                            reportResult(acc, 'ok');
+                        }
+                    }, 1500);
                 }
                 return;
             }

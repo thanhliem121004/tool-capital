@@ -433,9 +433,13 @@
                             const isReadingPage = window.location.pathname.includes('/read/');
                             if (!isReadingPage) {
                                 setDebug('Phat hien thu Microsoft trong danh sach. Dang mo thu...', '#0284c7');
-                                // Tìm thẻ tr / li chứa dòng thư, sau đó ưu tiên click vào thẻ a (liên kết) bên trong
-                                const parentRow = emailRow.closest('tr') || emailRow.closest('li') || emailRow;
-                                const targetBtn = parentRow.querySelector('a') || parentRow;
+                                // Tìm kiếm thẻ liên kết để click:
+                                const targetBtn = emailRow.tagName === 'A' ? emailRow : 
+                                                  emailRow.querySelector('a') || 
+                                                  emailRow.closest('a') || 
+                                                  emailRow.closest('tr')?.querySelector('a') ||
+                                                  emailRow.closest('li')?.querySelector('a') ||
+                                                  emailRow;
                                 safeClick(targetBtn);
                                 return; // Cho trang doc thu load
                             }
