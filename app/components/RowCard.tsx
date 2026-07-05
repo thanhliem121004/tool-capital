@@ -612,7 +612,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
       const finalMkCapital = isCurrentlyCapitalError ? row.newMkCapital : newMkCapital;
       
       const isMailError = newPassword === 'SAI MẬT KHẨU MAIL';
-      const isCapError = finalMkCapital.toUpperCase().includes('SAI');
+      const isCapError = typeof finalMkCapital === 'string' && finalMkCapital.toUpperCase().includes('SAI');
       
       const finalRecovery = isMailError ? '' : generated;
       const finalEmail = (isMailError && isCapError) ? '' : row.email;
