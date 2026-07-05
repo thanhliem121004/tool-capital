@@ -381,58 +381,7 @@
             return;
         }
 
-        // Xử lý màn hình "Xác minh danh tính của bạn" (Proof Selection) - click vào Tile chọn email khôi phục
-        const isIdentityPage = document.body.innerText.includes('Xác minh danh tính') ||
-                               document.body.innerText.includes('Verify your identity') ||
-                               document.body.innerText.includes('Xác thực danh tính') ||
-                               document.querySelector('#idDiv_SAOTCS_ProofList') !== null;
-
-        if (isIdentityPage) {
-            const proofTile = Array.from(document.querySelectorAll('.tile-layout, .tile, #idDiv_SAOTCS_ProofList .tile, [id*="ProofList"]')).find(el => {
-                if (el.offsetWidth === 0) return false;
-                const txt = (el.textContent || '').trim().toLowerCase();
-                return txt.includes('gửi email đến') ||
-                       txt.includes('email to') ||
-                       (txt.includes('@') && txt.includes('*') && (txt.includes('email') || txt.includes('gửi') || txt.includes('gửi email')));
-            });
-            if (proofTile) {
-                setDebug(`🎯 Click chọn phương thức xác minh danh tính...`, '#0284c7');
-                safeClick(proofTile);
-                return;
-            }
-        }
-
-        const kmsiTitle = document.querySelector('#kmsiTitle, .kmsi');
-        const declineBtn = document.querySelector('#declineButton, #idBtn_Back');
-        if (kmsiTitle || declineBtn) {
-            // Click "Không" (Don't stay signed in)
-            const noBtn = declineBtn ||
-                Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a, div')).find(el => {
-                    if (el.offsetWidth === 0) return false;
-                    const txt = (el.textContent || el.value || '').trim().toLowerCase();
-                    return txt === 'không' || txt === 'no' || txt === 'decline';
-                });
-            if (noBtn) {
-                setDebug(`🚪 Click [Không] - Không duy trì đăng nhập...`, '#16a34a');
-                const rect = noBtn.getBoundingClientRect();
-                if (rect.width > 0 && rect.height > 0) {
-                    const cx = rect.left + rect.width / 2;
-                    const cy = rect.top + rect.height / 2;
-                    const opts = { bubbles: true, cancelable: true, clientX: cx, clientY: cy };
-                    noBtn.focus();
-                    noBtn.dispatchEvent(new PointerEvent('pointerdown', opts));
-                    noBtn.dispatchEvent(new MouseEvent('mousedown', opts));
-                    noBtn.dispatchEvent(new PointerEvent('pointerup', opts));
-                    noBtn.dispatchEvent(new MouseEvent('mouseup', opts));
-                    noBtn.dispatchEvent(new MouseEvent('click', opts));
-                    noBtn.click();
-                } else {
-                    noBtn.click();
-                }
-                clearInterval(interval);
-            }
-            return;
-        }
+        // Removed Identity Verification and KMSI as requested by user
 
         const sendCodeBtn = Array.from(document.querySelectorAll('input[type="submit"], input[type="button"], button')).find(el => {
             const txt = (el.textContent || el.value || '').trim().toLowerCase();
