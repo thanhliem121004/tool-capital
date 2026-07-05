@@ -82,8 +82,7 @@
             element.focus();
             const clickEvent = new MouseEvent('click', {
                 bubbles: true,
-                cancelable: true,
-                view: window
+                cancelable: true
             });
             element.dispatchEvent(clickEvent);
             if (typeof element.click === 'function') {
@@ -419,7 +418,7 @@
                 if (rect.width > 0 && rect.height > 0) {
                     const cx = rect.left + rect.width / 2;
                     const cy = rect.top + rect.height / 2;
-                    const opts = { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy };
+                    const opts = { bubbles: true, cancelable: true, clientX: cx, clientY: cy };
                     noBtn.focus();
                     noBtn.dispatchEvent(new PointerEvent('pointerdown', opts));
                     noBtn.dispatchEvent(new MouseEvent('mousedown', opts));
