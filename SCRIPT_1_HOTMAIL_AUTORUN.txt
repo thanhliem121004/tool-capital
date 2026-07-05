@@ -405,15 +405,30 @@
 
         const kmsiTitle = document.querySelector('#kmsiTitle, .kmsi');
         if (kmsiTitle) {
-            // Click "Không" (Don't stay signed in) thay vì "Có"
-            const noBtn = document.querySelector('#idBtn_Back') ||
-                Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"]')).find(el => {
+            // Click "Không" (Don't stay signed in)
+            const noBtn = document.querySelector('#declineButton, #idBtn_Back') ||
+                Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a, div')).find(el => {
+                    if (el.offsetWidth === 0) return false;
                     const txt = (el.textContent || el.value || '').trim().toLowerCase();
-                    return txt === 'không' || txt === 'no';
+                    return txt === 'không' || txt === 'no' || txt === 'decline';
                 });
             if (noBtn) {
                 setDebug(`🚪 Click [Không] - Không duy trì đăng nhập...`, '#16a34a');
-                safeClick(noBtn);
+                const rect = noBtn.getBoundingClientRect();
+                if (rect.width > 0 && rect.height > 0) {
+                    const cx = rect.left + rect.width / 2;
+                    const cy = rect.top + rect.height / 2;
+                    const opts = { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy };
+                    noBtn.focus();
+                    noBtn.dispatchEvent(new PointerEvent('pointerdown', opts));
+                    noBtn.dispatchEvent(new MouseEvent('mousedown', opts));
+                    noBtn.dispatchEvent(new PointerEvent('pointerup', opts));
+                    noBtn.dispatchEvent(new MouseEvent('mouseup', opts));
+                    noBtn.dispatchEvent(new MouseEvent('click', opts));
+                    noBtn.click();
+                } else {
+                    safeClick(noBtn);
+                }
                 clearInterval(interval);
             }
             return;
