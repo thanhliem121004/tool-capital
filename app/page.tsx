@@ -6,6 +6,7 @@ import { SheetForm } from './components/SheetForm';
 import { FilterBar } from './components/FilterBar';
 import { RowCard } from './components/RowCard';
 import { MercuryCard } from './components/MercuryCard';
+import { YouTubePlayer } from './components/YouTubePlayer';
 
 const DEFAULT_SHEET_ID = '1AB2LGfQqGP5es9nU2vMuwldI1HabyV1pyrVOhOC4GRE';
 const DEFAULT_SHEET_NAME = 'Sheet1';
@@ -885,6 +886,7 @@ export default function Home() {
           </>
         )}
       </div>
+      <YouTubePlayer />
     </div>
   );
 }
