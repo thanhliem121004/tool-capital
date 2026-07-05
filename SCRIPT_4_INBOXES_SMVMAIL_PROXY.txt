@@ -424,21 +424,31 @@
                     if (window.location.host.includes('inboxes.com') && isMailboxActive) {
                         const isReadingPage = window.location.pathname.includes('/read/');
                         if (!isReadingPage) {
-                            // Cach 1: Tim truc tiep the <a> co text chua "microsoft" va co href
-                            let emailLink = Array.from(document.querySelectorAll('a[href]')).find(a => {
-                                const txt = (a.textContent || '').trim().toLowerCase();
-                                return a.offsetWidth > 0 && txt.includes('microsoft') && 
-                                       !a.closest('header') && !a.closest('footer');
+                            // Tim SUBJECT chua "microsoft" - uu tien the nho nhat (span, a, td, p)
+                            const emailEl = Array.from(document.querySelectorAll('span, a, td, p, div, li, tr')).find(el => {
+                                const txt = (el.textContent || '').trim().toLowerCase();
+                                if (!txt.includes('microsoft')) return false;
+                                if (el.offsetWidth === 0 || el.offsetHeight === 0) return false;
+                                // Loai tru header, footer, marketing section
+                                if (el.closest('header') || el.closest('footer')) return false;
+                                // Chi lay element trong vung inbox (phan tren cua trang)
+                                const rect = el.getBoundingClientRect();
+                                return rect.top < window.innerHeight * 0.6 && rect.top > 0;
                             });
                             
-                            // Cach 2: Tim the <a> co href chua "/read/" (link mo thu)
-                            if (!emailLink) {
-                                emailLink = Array.from(document.querySelectorAll('a[href*="/read/"]')).find(a => a.offsetWidth > 0);
-                            }
-                            
-                            if (emailLink && emailLink.href) {
-                                setDebug('Mo thu Microsoft: ' + emailLink.href.substring(0, 60) + '...', '#0284c7');
-                                window.location.href = emailLink.href;
+                            if (emailEl) {
+                                setDebug('Click mo thu Microsoft...', '#0284c7');
+                                // Click realistic voi toa do
+                                const rect = emailEl.getBoundingClientRect();
+                                const cx = rect.left + rect.width / 2;
+                                const cy = rect.top + rect.height / 2;
+                                const opts = { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy };
+                                emailEl.dispatchEvent(new PointerEvent('pointerdown', opts));
+                                emailEl.dispatchEvent(new MouseEvent('mousedown', opts));
+                                emailEl.dispatchEvent(new PointerEvent('pointerup', opts));
+                                emailEl.dispatchEvent(new MouseEvent('mouseup', opts));
+                                emailEl.dispatchEvent(new MouseEvent('click', opts));
+                                emailEl.click();
                                 return;
                             }
                         }

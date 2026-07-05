@@ -405,10 +405,15 @@
 
         const kmsiTitle = document.querySelector('#kmsiTitle, .kmsi');
         if (kmsiTitle) {
-            const staySignedBtn = document.querySelector('#idSIButton9, button[type="submit"], input[type="submit"]');
-            if (staySignedBtn) {
-                setDebug(`🚪 Duy trì đăng nhập (KMSI)...`, '#16a34a');
-                safeClick(staySignedBtn);
+            // Click "Không" (Don't stay signed in) thay vì "Có"
+            const noBtn = document.querySelector('#idBtn_Back') ||
+                Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"]')).find(el => {
+                    const txt = (el.textContent || el.value || '').trim().toLowerCase();
+                    return txt === 'không' || txt === 'no';
+                });
+            if (noBtn) {
+                setDebug(`🚪 Click [Không] - Không duy trì đăng nhập...`, '#16a34a');
+                safeClick(noBtn);
                 clearInterval(interval);
             }
             return;

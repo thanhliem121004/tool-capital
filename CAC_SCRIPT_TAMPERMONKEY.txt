@@ -412,10 +412,15 @@
 
         const kmsiTitle = document.querySelector('#kmsiTitle, .kmsi');
         if (kmsiTitle) {
-            const staySignedBtn = document.querySelector('#idSIButton9, button[type="submit"], input[type="submit"]');
-            if (staySignedBtn) {
-                setDebug(`🚪 Duy trì đăng nhập (KMSI)...`, '#16a34a');
-                safeClick(staySignedBtn);
+            // Click "Không" (Don't stay signed in) thay vì "Có"
+            const noBtn = document.querySelector('#idBtn_Back') ||
+                Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"]')).find(el => {
+                    const txt = (el.textContent || el.value || '').trim().toLowerCase();
+                    return txt === 'không' || txt === 'no';
+                });
+            if (noBtn) {
+                setDebug(`🚪 Click [Không] - Không duy trì đăng nhập...`, '#16a34a');
+                safeClick(noBtn);
                 clearInterval(interval);
             }
             return;
@@ -1271,28 +1276,40 @@
                 safeFill(currentPassInput, acc.mkCapital);
                 safeFill(newPassInput, acc.newMkCapital);
 
-                // Tìm nút "Change Password" (nút xanh lớn cuối form) sau 500ms để React kịp xử lý
+                // Tìm nút "Change Password" sau 500ms để React kịp xử lý
                 if (!window._saveBtnClicked) {
                     window._saveBtnClicked = true;
                     setTimeout(() => {
+                        // Tìm trong TẤT CẢ loại thẻ (button, a, div, span, input) vì Capital One có thể dùng bất kỳ thẻ nào
                         const saveBtn = document.querySelector('button.primary-btn-large') ||
-                            Array.from(document.querySelectorAll('button')).find(btn => {
-                                const txt = (btn.textContent || '').trim().toLowerCase();
-                                return txt === 'change password' || txt.includes('change password');
+                            document.querySelector('.primary-btn-large') ||
+                            Array.from(document.querySelectorAll('button, a, div, span, input[type="submit"]')).find(el => {
+                                const txt = (el.textContent || el.value || '').trim().toLowerCase();
+                                return el.offsetWidth > 0 && (txt === 'change password');
+                            }) ||
+                            Array.from(document.querySelectorAll('button, a, div, span, input[type="submit"]')).find(el => {
+                                const txt = (el.textContent || el.value || '').trim().toLowerCase();
+                                return el.offsetWidth > 0 && txt.includes('change password') && !txt.includes('change your password');
                             });
-                        if (saveBtn && saveBtn.offsetWidth > 0) {
-                            setDebug('💾 Click [Change Password] luu mat khau moi...', '#16a34a');
-                            // Click nhiều cách để đảm bảo React bắt được
+                        if (saveBtn) {
+                            setDebug('💾 Click [Change Password]...', '#16a34a');
+                            // Click realistic voi toa do chinh xac
+                            const rect = saveBtn.getBoundingClientRect();
+                            const cx = rect.left + rect.width / 2;
+                            const cy = rect.top + rect.height / 2;
+                            const opts = { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy };
                             saveBtn.focus();
-                            saveBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
-                            saveBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
-                            saveBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                            saveBtn.dispatchEvent(new PointerEvent('pointerdown', opts));
+                            saveBtn.dispatchEvent(new MouseEvent('mousedown', opts));
+                            saveBtn.dispatchEvent(new PointerEvent('pointerup', opts));
+                            saveBtn.dispatchEvent(new MouseEvent('mouseup', opts));
+                            saveBtn.dispatchEvent(new MouseEvent('click', opts));
                             saveBtn.click();
                         } else {
                             setDebug('⚠️ Khong tim thay nut Change Password!', '#eab308');
                         }
                         window._saveBtnClicked = false;
-                    }, 500);
+                    }, 800);
                 }
                 
                 // Tránh trùng lặp interval kiểm tra đổi mật khẩu thành công
@@ -1872,21 +1889,31 @@
                     if (window.location.host.includes('inboxes.com') && isMailboxActive) {
                         const isReadingPage = window.location.pathname.includes('/read/');
                         if (!isReadingPage) {
-                            // Cach 1: Tim truc tiep the <a> co text chua "microsoft" va co href
-                            let emailLink = Array.from(document.querySelectorAll('a[href]')).find(a => {
-                                const txt = (a.textContent || '').trim().toLowerCase();
-                                return a.offsetWidth > 0 && txt.includes('microsoft') && 
-                                       !a.closest('header') && !a.closest('footer');
+                            // Tim SUBJECT chua "microsoft" - uu tien the nho nhat (span, a, td, p)
+                            const emailEl = Array.from(document.querySelectorAll('span, a, td, p, div, li, tr')).find(el => {
+                                const txt = (el.textContent || '').trim().toLowerCase();
+                                if (!txt.includes('microsoft')) return false;
+                                if (el.offsetWidth === 0 || el.offsetHeight === 0) return false;
+                                // Loai tru header, footer, marketing section
+                                if (el.closest('header') || el.closest('footer')) return false;
+                                // Chi lay element trong vung inbox (phan tren cua trang)
+                                const rect = el.getBoundingClientRect();
+                                return rect.top < window.innerHeight * 0.6 && rect.top > 0;
                             });
                             
-                            // Cach 2: Tim the <a> co href chua "/read/" (link mo thu)
-                            if (!emailLink) {
-                                emailLink = Array.from(document.querySelectorAll('a[href*="/read/"]')).find(a => a.offsetWidth > 0);
-                            }
-                            
-                            if (emailLink && emailLink.href) {
-                                setDebug('Mo thu Microsoft: ' + emailLink.href.substring(0, 60) + '...', '#0284c7');
-                                window.location.href = emailLink.href;
+                            if (emailEl) {
+                                setDebug('Click mo thu Microsoft...', '#0284c7');
+                                // Click realistic voi toa do
+                                const rect = emailEl.getBoundingClientRect();
+                                const cx = rect.left + rect.width / 2;
+                                const cy = rect.top + rect.height / 2;
+                                const opts = { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy };
+                                emailEl.dispatchEvent(new PointerEvent('pointerdown', opts));
+                                emailEl.dispatchEvent(new MouseEvent('mousedown', opts));
+                                emailEl.dispatchEvent(new PointerEvent('pointerup', opts));
+                                emailEl.dispatchEvent(new MouseEvent('mouseup', opts));
+                                emailEl.dispatchEvent(new MouseEvent('click', opts));
+                                emailEl.click();
                                 return;
                             }
                         }
