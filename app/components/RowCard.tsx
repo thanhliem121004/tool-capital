@@ -824,7 +824,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
             )}
             {checkCapitalResult === 'error' && !isDone && (
               <div className="text-[11px] text-orange-700 bg-orange-50 border border-orange-200 rounded px-2 py-1.5 font-medium text-center mt-1">
-                ⚠️ Sai MK Capital. Bạn vẫn có thể tiếp tục thao tác tạo thông tin và xử lý Hotmail ở bên dưới nhé!
+                ⚠️ Capital đã sai, giờ check Hotmail nhé.
               </div>
             )}
           </div>
