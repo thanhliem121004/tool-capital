@@ -75,10 +75,17 @@ export function MercuryCard({ row, onUpdated, mailProvider, preferredDomain = 'r
   }, [row.email, row.password]);
 
   const generateRandomPassword = () => {
+    // Đảm bảo KHÔNG có 2 ký tự nào giống nhau đứng liền kề nhau
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let pass = '';
+    let lastChar = '';
     for (let i = 0; i < 10; i++) {
-      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+      let char = '';
+      do {
+        char = chars.charAt(Math.floor(Math.random() * chars.length));
+      } while (char === lastChar);
+      pass += char;
+      lastChar = char;
     }
     return pass + 'A!';
   };

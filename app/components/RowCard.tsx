@@ -257,10 +257,17 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
 
   const generateRandomPassword = () => {
     // Chỉ tạo chữ và số dài 10 ký tự, sau đó thêm A! ở dưới
+    // Đảm bảo KHÔNG có 2 ký tự nào giống nhau đứng liền kề nhau
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let pass = '';
+    let lastChar = '';
     for (let i = 0; i < 10; i++) {
-      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+      let char = '';
+      do {
+        char = chars.charAt(Math.floor(Math.random() * chars.length));
+      } while (char === lastChar);
+      pass += char;
+      lastChar = char;
     }
     return pass;
   };
