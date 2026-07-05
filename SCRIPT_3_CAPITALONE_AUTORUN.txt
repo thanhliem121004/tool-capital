@@ -67,6 +67,8 @@
 
             element.dispatchEvent(new Event('input', { bubbles: true }));
             element.dispatchEvent(new Event('change', { bubbles: true }));
+            element.dispatchEvent(new Event('blur', { bubbles: true }));
+            element.dispatchEvent(new Event('focus', { bubbles: true }));
             element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: value }));
             element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: value }));
         } catch (e) {
@@ -321,9 +323,13 @@
                 return;
             }
 
-            const changeBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+            const changeBtn = Array.from(document.querySelectorAll('button, a, [role="button"]')).find(btn => {
                 const txt = (btn.textContent || '').trim().toLowerCase();
-                return txt === 'change' || (btn.classList.contains('secondary-btn-large') && txt.includes('change')) || (btn.className && typeof btn.className === 'string' && btn.className.includes('secondary-btn') && txt.includes('change'));
+                const cls = (btn.className || '').toString().toLowerCase();
+                return txt === 'change' || 
+                       txt === 'change password' || 
+                       txt.includes('change password') ||
+                       (txt.includes('change') && (cls.includes('btn') || cls.includes('button') || cls.includes('large')));
             });
 
             if (changeBtn && changeBtn.offsetWidth > 0) {
