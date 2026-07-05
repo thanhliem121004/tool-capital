@@ -396,7 +396,10 @@
                 });
             }
 
-            if (loginBtn && emailInput && emailInput.value.length > 0 && (passInput ? passInput.value.length > 0 : true)) {
+            const isEmailFilled = !emailInput || emailInput.value === acc.email;
+            const isPassFilled = !passInput || (acc.mkCapital && passInput.value === acc.mkCapital);
+
+            if (loginBtn && isEmailFilled && isPassFilled) {
                 setDebug('Click [Sign In/Continue]...', '#16a34a');
                 safeClick(loginBtn);
                 return;
