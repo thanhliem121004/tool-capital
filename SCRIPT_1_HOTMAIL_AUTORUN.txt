@@ -705,87 +705,103 @@
         if (hasNewRecoveryOnPage && emailElements.length > 0) {
             hasOldRecoveryOnPage = true;
             for (const emailEl of emailElements) {
-                // Find all Remove buttons
-                const allRemoveBtns = Array.from(document.querySelectorAll('button, a')).filter(btn => {
-                    if (btn.children.length > 0 && !btn.id) return false;
-                    const txt = (btn.textContent || btn.value || '').trim().toLowerCase();
-                    return btn.id === 'Remove' || txt === 'xóa' || txt === 'remove';
-                });
-                
-                // Find the Remove button that is in the same container as the old email
-                const oldEmailRemoveBtn = allRemoveBtns.find(btn => {
-                    if (btn.offsetWidth === 0) return false;
-                    let parent = btn.parentElement;
-                    for (let i = 0; i < 8 && parent; i++) {
-                        if (parent.textContent && isOldRecoveryEmail(parent.textContent, acc)) {
-                            return true;
-                        }
-                        parent = parent.parentElement;
-                    }
-                    return false;
-                });
+                let current = emailEl.parentElement;
+                let removeBtn = null;
+                let expandBtn = null;
 
-                if (oldEmailRemoveBtn) {
-                    setDebug(`🗑️ Click nút Xóa email cũ...`, '#e11d48');
-                    safeClick(oldEmailRemoveBtn);
-                    return; // Wait for next tick
-                }
-
-                // If Remove button not visible, click the row to expand it
-                let parent = emailEl.parentElement;
-                let rowContainer = null;
-                for (let depth = 0; depth < 5 && parent; depth++) {
-                    if (parent.classList.contains('box') || parent.classList.contains('pullout') || parent.tagName === 'BUTTON' || parent.getAttribute('role') === 'button' || parent.classList.contains('ms-Grid-col')) {
-                        rowContainer = parent;
+                // Go up the tree to find the Remove button and the Expand button, but stop if we hit another proof
+                while (current && current.tagName !== 'BODY') {
+                    const txt = current.innerText || '';
+                    // Stop if we reached the main list container (it contains other proofs like Password or the new email)
+                    if (txt.includes('Nhập mật khẩu') || txt.includes('Enter password') || txt.includes('Mật khẩu') || (acc.recovery && txt.toLowerCase().includes(acc.recovery.toLowerCase()))) {
                         break;
                     }
-                    parent = parent.parentElement;
+
+                    if (!expandBtn) {
+                        const btn = Array.from(current.querySelectorAll('button, [role="button"], .ms-Icon--ChevronRight, [class*="ChevronRight"], [class*="ChevronDown"]')).find(b => b.offsetWidth > 0);
+                        if (btn) expandBtn = btn;
+                    }
+
+                    if (!removeBtn) {
+                        const btn = Array.from(current.querySelectorAll('button, a')).find(b => {
+                            const bt = (b.textContent || '').trim().toLowerCase();
+                            return b.id === 'Remove' || bt === 'xóa' || bt === 'remove';
+                        });
+                        if (btn && btn.offsetWidth > 0) {
+                            removeBtn = btn;
+                        }
+                    }
+
+                    current = current.parentElement;
                 }
 
-                if (rowContainer && rowContainer.offsetWidth > 0) {
+                if (removeBtn && removeBtn.offsetWidth > 0) {
+                    setDebug(`🗑️ Click nút Xóa email cũ...`, '#e11d48');
+                    safeClick(removeBtn);
+                    return;
+                }
+
+                if (expandBtn && expandBtn.offsetWidth > 0) {
                     setDebug(`🔓 Click mở rộng email cũ...`, '#0284c7');
-                    safeClick(rowContainer);
+                    safeClick(expandBtn);
+                    return;
+                } else if (emailEl.parentElement) {
+                    // Fallback
+                    safeClick(emailEl.parentElement);
                     return;
                 }
             }
         }
 
         if (hasNewRecoveryOnPage && !hasOldRecoveryOnPage) {
-            // Find Change Password button
-            const allChangePassBtns = Array.from(document.querySelectorAll('button, a')).filter(btn => {
-                const txt = (btn.textContent || btn.value || '').trim().toLowerCase();
-                return btn.id === 'ChangePassword' || txt === 'thay đổi mật khẩu' || txt === 'change password';
-            });
-            const changePassBtn = allChangePassBtns.find(btn => btn.offsetWidth > 0);
-
-            if (changePassBtn) {
-                setDebug(`🔑 Click chọn [Thay đổi mật khẩu]...`, '#e11d48');
-                safeClick(changePassBtn);
-                return;
-            }
-
-            // If Change Password not visible, click the password row to expand
-            const passwordLink = Array.from(document.querySelectorAll('span.pullout-link-text, a, button, div')).find(el => {
+            // Find Change Password button using the same isolation logic
+            const passwordLink = Array.from(document.querySelectorAll('*')).find(el => {
                 if (el.children.length > 0) return false;
                 const txt = (el.textContent || '').trim().toLowerCase();
-                return txt === 'nhập mật khẩu' || txt === 'mật khẩu' || txt === 'password' || txt.includes('nhập mật khẩu');
+                return txt === 'nhập mật khẩu' || txt === 'mật khẩu' || txt === 'password';
             });
 
             if (passwordLink) {
-                let parent = passwordLink.parentElement;
-                let rowContainer = null;
-                for (let depth = 0; depth < 5 && parent; depth++) {
-                    if (parent.classList.contains('box') || parent.classList.contains('pullout') || parent.tagName === 'BUTTON' || parent.getAttribute('role') === 'button' || parent.classList.contains('ms-Grid-col')) {
-                        rowContainer = parent;
-                        break;
+                let current = passwordLink.parentElement;
+                let changePassBtn = null;
+                let expandBtn = null;
+
+                while (current && current.tagName !== 'BODY') {
+                    const txt = current.innerText || '';
+                    if (txt.includes('@') && txt.includes('.')) {
+                        break; // Reached the list containing emails, too high!
                     }
-                    parent = parent.parentElement;
+
+                    if (!changePassBtn) {
+                        const btn = Array.from(current.querySelectorAll('button, a')).find(b => {
+                            const bt = (b.textContent || '').trim().toLowerCase();
+                            return b.id === 'ChangePassword' || bt === 'thay đổi mật khẩu' || bt === 'change password';
+                        });
+                        if (btn && btn.offsetWidth > 0) {
+                            changePassBtn = btn;
+                        }
+                    }
+
+                    if (!expandBtn) {
+                        const btn = Array.from(current.querySelectorAll('button, [role="button"], .ms-Icon--ChevronRight, [class*="ChevronRight"], [class*="ChevronDown"]')).find(b => b.offsetWidth > 0 && b.id !== 'ChangePassword' && b.id !== 'Remove');
+                        if (btn) expandBtn = btn;
+                    }
+
+                    current = current.parentElement;
                 }
 
-                const targetToClick = rowContainer || passwordLink;
-                if (targetToClick && targetToClick.offsetWidth > 0) {
+                if (changePassBtn && changePassBtn.offsetWidth > 0) {
+                    setDebug(`🔑 Click chọn [Thay đổi mật khẩu]...`, '#e11d48');
+                    safeClick(changePassBtn);
+                    return;
+                }
+
+                if (expandBtn && expandBtn.offsetWidth > 0) {
                     setDebug(`🔓 Click mở rộng mục Mật khẩu...`, '#0284c7');
-                    safeClick(targetToClick);
+                    safeClick(expandBtn);
+                    return;
+                } else if (passwordLink.parentElement) {
+                    safeClick(passwordLink.parentElement);
                     return;
                 }
             }
