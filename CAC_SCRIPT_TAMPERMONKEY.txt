@@ -1260,18 +1260,45 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
                 }
 
                 if (currentPassInput.value === acc.mkCapital && newPassInput.value === acc.newMkCapital) {
-                    const saveBtn = Array.from(document.querySelectorAll('button')).find(btn => {
-                        const txt = (btn.textContent || '').trim().toLowerCase();
-                        return btn.type === 'submit' || txt.includes('save') || txt.includes('change password') || txt.includes('update');
+                    const saveBtn = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"], [role="button"]')).find(btn => {
+                        const txt = (btn.textContent || btn.value || '').trim().toLowerCase();
+                        return btn.type === 'submit' || txt.includes('save') || txt.includes('change password') || txt.includes('update') || txt.includes('submit');
                     });
                     if (saveBtn) {
                         setDebug('💾 Click [Save] luu mat khau moi...', '#16a34a');
                         safeClick(saveBtn);
                         
-                        // Sau khi click Save de doi mat khau thanh cong, ta tu dong bao cao ket qua OK ve tool
-                        setTimeout(() => {
-                            reportResult(acc, 'ok');
-                        }, 2500);
+                        // Đợi đổi mật khẩu thành công thật sự
+                        let checkCount = 0;
+                        const checkSuccessInterval = setInterval(() => {
+                            checkCount++;
+                            const bodyText = document.body.innerText.toLowerCase();
+                            
+                            // 1. Kiểm tra xem có thông báo lỗi nào xuất hiện không
+                            const hasError = bodyText.includes('must contain') || 
+                                             bodyText.includes('incorrect current password');
+                                             
+                            if (hasError && checkCount < 6) {
+                                // Nếu có lỗi nhập liệu, dừng check
+                                clearInterval(checkSuccessInterval);
+                                setDebug('❌ Sai mật khẩu hiện tại hoặc mật khẩu mới không đúng yêu cầu!', '#be123c');
+                                return;
+                            }
+
+                            // 2. Kiểm tra xem các ô nhập mật khẩu đã biến mất HOẶC có chữ Success/Changed/Saved/Updated
+                            const currentInput = document.getElementById('id_currentPassword') || document.querySelector('input[name="currentPassword"]');
+                            const isInputsGone = !currentInput || currentInput.offsetWidth === 0;
+                            const isSuccessText = bodyText.includes('success') || 
+                                                  bodyText.includes('changed') || 
+                                                  bodyText.includes('saved') || 
+                                                  bodyText.includes('updated');
+
+                            if (isInputsGone || isSuccessText || checkCount >= 16) { // Chờ tối đa 8 giây (16 * 500ms)
+                                clearInterval(checkSuccessInterval);
+                                setDebug('🎉 Đổi mật khẩu Capital thành công!', '#16a34a');
+                                reportResult(acc, 'ok');
+                            }
+                        }, 500);
                     }
                 }
                 return;
