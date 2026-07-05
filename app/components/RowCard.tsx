@@ -159,14 +159,14 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
   const [checkCapitalError, setCheckCapitalError] = useState('');
 
   useEffect(() => {
-    if (row.newPassword === 'SAI CAPITAL' || row.isPasswordError) {
+    if (row.newMkCapital === 'SAI CAPITAL' || row.newMkCapital === 'SAI MẬT KHẨU CAPITAL' || row.isPasswordError) {
       setCheckCapitalResult('error');
     } else if (row.isDone) {
       setCheckCapitalResult('ok');
     } else {
       setCheckCapitalResult('idle');
     }
-  }, [row.newPassword, row.isPasswordError, row.isDone]);
+  }, [row.newMkCapital, row.isPasswordError, row.isDone]);
 
   const handleCheckCapital = async () => {
     setCheckingCapital(true);
@@ -208,7 +208,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
             } else {
               setCheckCapitalResult('error');
               setCheckCapitalError(result.error || 'Sai tài khoản/mật khẩu Capital');
-              onUpdated(row.rowIndex, { newPassword: 'SAI CAPITAL' }); // Bỏ isPasswordError: true để không khóa hàng
+              onUpdated(row.rowIndex, { newMkCapital: 'SAI CAPITAL' }); // Bỏ isPasswordError: true để không khóa hàng
               
               // Tự động ghi "SAI MẬT KHẨU CAPITAL" vào cột N
               fetch('/api/mark-error', {
@@ -820,6 +820,11 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
             {checkCapitalError && (
               <div className="text-[10px] text-red-600 bg-red-50 border border-red-100 rounded px-2 py-1 font-medium text-center">
                 ⚠️ {checkCapitalError}
+              </div>
+            )}
+            {checkCapitalResult === 'error' && !isDone && (
+              <div className="text-[11px] text-orange-700 bg-orange-50 border border-orange-200 rounded px-2 py-1.5 font-medium text-center mt-1">
+                ⚠️ Sai MK Capital. Bạn vẫn có thể tiếp tục thao tác tạo thông tin và xử lý Hotmail ở bên dưới nhé!
               </div>
             )}
           </div>
