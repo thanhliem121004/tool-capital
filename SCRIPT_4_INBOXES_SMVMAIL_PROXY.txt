@@ -1,4 +1,4 @@
-﻿// ==UserScript==
+// ==UserScript==
 // @name         Inboxes & SMVmail OTP Auto Scraper & Bridge
 // @namespace    http://tampermonkey.net/
 // @version      1.1
@@ -422,9 +422,9 @@
 
                     // 2. Kiem tra va tu dong click mo email Microsoft neu dang o trang danh sach
                     if (window.location.host.includes('inboxes.com') && isMailboxActive) {
-                        const emailRow = Array.from(document.querySelectorAll('div, span, p, a, h1, h2, h3, h4, h5, h6')).find(el => {
+                        const emailRow = Array.from(document.querySelectorAll('td, tr, li, div, span, p, a, h1, h2, h3, h4, h5, h6')).find(el => {
                             const txt = (el.textContent || '').trim().toLowerCase();
-                            // Chá»‰ cáº§n email chá»©a tá»« khÃ³a microsoft (khÃ´ng dáº¥u nÃªn 100% khá»›p) vÃ  loáº¡i trá»« script/style
+                            // Chỉ cần email chứa từ khóa microsoft (không dấu nên 100% khớp) và loại trừ script/style
                             const isMicrosoftEmail = txt.includes('microsoft') && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE';
                             return el.offsetWidth > 0 && isMicrosoftEmail && !el.closest('header') && !el.closest('footer') && !el.closest('.loading') && !el.closest('#footer-note');
                         });
@@ -433,8 +433,8 @@
                             const isReadingPage = window.location.pathname.includes('/read/');
                             if (!isReadingPage) {
                                 setDebug('Phat hien thu Microsoft trong danh sach. Dang mo thu...', '#0284c7');
-                                // TiÌ€m theÌ‰ click tr: HÃ ng báº£ng chá»©a dÃ²ng thÆ°, hoáº·c td, hoáº·c div bá»c ngoÃ i, hoáº·c a
-                                const targetBtn = emailRow.closest('tr') || emailRow.closest('td') || emailRow.closest('a') || emailRow;
+                                // Tìm thẻ click tr: Hàng bảng chứa dòng thư, hoặc td, hoặc li, hoặc div bọc ngoài, hoặc a
+                                const targetBtn = emailRow.closest('tr') || emailRow.closest('td') || emailRow.closest('li') || emailRow.closest('a') || emailRow;
                                 safeClick(targetBtn);
                                 return; // Cho trang doc thu load
                             }

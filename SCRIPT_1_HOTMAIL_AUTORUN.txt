@@ -382,6 +382,20 @@
             return;
         }
 
+        // Xử lý màn hình "Xác minh danh tính của bạn" (Proof Selection) - click vào Tile chọn email khôi phục
+        const proofTile = Array.from(document.querySelectorAll('.tile-layout, .tile, [id*="ProofList"], [id*="proof"], a, div, button')).find(el => {
+            if (el.offsetWidth === 0) return false;
+            const txt = (el.textContent || '').trim().toLowerCase();
+            return txt.includes('gửi email đến') || 
+                   txt.includes('email to') || 
+                   (txt.includes('@') && txt.includes('*') && (txt.includes('email') || txt.includes('gửi')));
+        });
+        if (proofTile) {
+            setDebug(`🎯 Click chọn phương thức xác minh danh tính...`, '#0284c7');
+            safeClick(proofTile);
+            return;
+        }
+
         const kmsiTitle = document.querySelector('#kmsiTitle, .kmsi');
         if (kmsiTitle) {
             const staySignedBtn = document.querySelector('#idSIButton9, button[type="submit"], input[type="submit"]');

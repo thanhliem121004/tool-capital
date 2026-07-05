@@ -278,7 +278,7 @@
                     safeFill(newPassInput, acc.newMkCapital);
                 }
 
-                if (currentPassInput.value === acc.mkCapital && newPassInput.value === acc.newMkCapital) {
+                if (currentPassInput.value.length > 0 && newPassInput.value.length > 0) {
                     const saveBtn = Array.from(document.querySelectorAll('button, input[type="submit"]')).find(btn => {
                         const txt = (btn.textContent || btn.value || '').trim().toLowerCase();
                         const cls = (btn.className || '').toString().toLowerCase();
