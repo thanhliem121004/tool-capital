@@ -159,7 +159,10 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
   const [checkCapitalError, setCheckCapitalError] = useState('');
 
   useEffect(() => {
-    if (row.newMkCapital === 'SAI CAPITAL' || row.newMkCapital === 'SAI MẬT KHẨU CAPITAL' || row.isPasswordError) {
+    const capitalStr = typeof row.newMkCapital === 'string' ? row.newMkCapital.toUpperCase() : '';
+    const hasCapitalError = capitalStr.includes('SAI CAPITAL') || capitalStr.includes('SAI MẬT KHẨU CAPITAL');
+    
+    if (hasCapitalError || row.isPasswordError) {
       setCheckCapitalResult('error');
     } else if (row.isDone) {
       setCheckCapitalResult('ok');
@@ -457,7 +460,8 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
         updates.newPassword = generatedPass;
         
         // Chỉ tạo pass Capital mới nếu KHÔNG bị lỗi Capital
-        const isCapitalError = checkCapitalResult === 'error' || row.newMkCapital === 'SAI CAPITAL' || row.newMkCapital === 'SAI MẬT KHẨU CAPITAL';
+        const capitalStr = typeof row.newMkCapital === 'string' ? row.newMkCapital.toUpperCase() : '';
+        const isCapitalError = checkCapitalResult === 'error' || capitalStr.includes('SAI CAPITAL') || capitalStr.includes('SAI MẬT KHẨU CAPITAL');
         if (!isCapitalError) {
           const generatedCap = generatedPass + 'A!';     // Capital mới (bằng MK Hotmail + 'A!')
           setNewMkCapital(generatedCap);
@@ -603,7 +607,8 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
     setLoadingComplete(true);
     setErr('');
     try {
-      const isCurrentlyCapitalError = row.newMkCapital === 'SAI CAPITAL' || row.newMkCapital === 'SAI MẬT KHẨU CAPITAL' || checkCapitalResult === 'error';
+      const capitalStr = typeof row.newMkCapital === 'string' ? row.newMkCapital.toUpperCase() : '';
+      const isCurrentlyCapitalError = checkCapitalResult === 'error' || capitalStr.includes('SAI CAPITAL') || capitalStr.includes('SAI MẬT KHẨU CAPITAL');
       const finalMkCapital = isCurrentlyCapitalError ? row.newMkCapital : newMkCapital;
 
       const body: any = {
@@ -655,6 +660,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
 
   const isActive = activeEmail === row.email;
   const isPasswordError = row.isPasswordError || false;
+  const isCapitalErrorUI = checkCapitalResult === 'error';
 
   return (
     <div
@@ -662,10 +668,12 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
         isActive 
           ? 'border-blue-500 ring-4 ring-blue-400 ring-opacity-40 shadow-blue-200 shadow-xl z-10 bg-blue-50/10 active-bounce-effect' 
           : isPasswordError
-            ? 'border-red-400 bg-red-50 opacity-40 grayscale-[30%] hover:opacity-100'
-            : isDone 
-              ? 'border-green-400 bg-green-50' 
-              : 'border-orange-200 bg-orange-50 hover:border-blue-300 gentle-bounce-effect'
+            ? 'border-red-500 bg-red-50 opacity-40 grayscale-[30%] hover:opacity-100'
+            : isCapitalErrorUI
+              ? 'border-red-400 bg-red-50' // Màu đỏ nhưng không bị mờ hay vô hiệu hóa
+              : isDone 
+                ? 'border-green-400 bg-green-50' 
+                : 'border-orange-200 bg-orange-50 hover:border-blue-300 gentle-bounce-effect'
       }`}
     >
       <style dangerouslySetInnerHTML={{__html: `
@@ -971,22 +979,25 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    value={newMkCapital}
+                    value={isCapitalErrorUI ? row.newMkCapital : newMkCapital}
                     onChange={(e) => setNewMkCapital(e.target.value)}
+                    disabled={isCapitalErrorUI}
                     placeholder="Nhập MK Capital mới..."
-                    className="flex-1 text-sm bg-white border border-gray-300 rounded p-1.5 outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                    className={`flex-1 text-sm bg-white border border-gray-300 rounded p-1.5 outline-none focus:ring-1 focus:ring-blue-500 font-medium ${isCapitalErrorUI ? 'bg-red-100 text-red-700 cursor-not-allowed' : ''}`}
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const base = newPassword ? newPassword : generateRandomPassword();
-                      setNewMkCapital(base + 'A!');
-                    }}
-                    className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300 whitespace-nowrap"
-                    title="Tự động tạo mật khẩu ngẫu nhiên"
-                  >
-                    🎲 Ngẫu nhiên
-                  </button>
+                  {!isCapitalErrorUI && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const base = newPassword ? newPassword : generateRandomPassword();
+                        setNewMkCapital(base + 'A!');
+                      }}
+                      className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300 whitespace-nowrap"
+                      title="Tự động tạo mật khẩu ngẫu nhiên"
+                    >
+                      🎲 Ngẫu nhiên
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
