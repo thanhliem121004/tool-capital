@@ -594,8 +594,8 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
     setLoadingComplete(true);
     setErr('');
     try {
-      const isCurrentlyCapitalError = row.newMkCapital === 'SAI CAPITAL';
-      const finalMkCapital = isCurrentlyCapitalError ? 'SAI CAPITAL' : newMkCapital;
+      const isCurrentlyCapitalError = row.newMkCapital === 'SAI CAPITAL' || row.newMkCapital === 'SAI MẬT KHẨU CAPITAL' || checkCapitalResult === 'error';
+      const finalMkCapital = isCurrentlyCapitalError ? row.newMkCapital : newMkCapital;
 
       const body: any = {
         sheetId,
