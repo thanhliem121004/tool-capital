@@ -59,7 +59,7 @@ public class Win32 {
     $sb = New-Object System.Text.StringBuilder 256
     [Win32]::GetWindowText($hWnd, $sb, 256) | Out-Null
     $title = $sb.ToString()
-    if ($title -like "*Capital One Shopping*") {
+    if ($title -like "*CAPITAL_AUTO_CHECK_WINDOW*") {
         # Gửi thông điệp WM_CLOSE (0x0010) để đóng cửa sổ
         [Win32]::SendMessage($hWnd, 0x0010, 0, 0) | Out-Null
     }

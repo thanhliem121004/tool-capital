@@ -1158,12 +1158,26 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
 
         // 1. Kiem tra xem co phai dang o luong tu dong check khong
         const checkAcc = checkURLHash();
-        if (checkAcc) {
-            setDebug(`Luong CHECK tu dong!<br>Acc: ${checkAcc.email}`, '#6366f1');
+        const isCurrentlyAuto = !!checkAcc || sessionStorage.getItem('is_auto_check') === 'true';
+
+        if (isCurrentlyAuto) {
+            if (checkAcc) {
+                sessionStorage.setItem('is_auto_check', 'true');
+                sessionStorage.setItem('auto_check_acc', JSON.stringify(checkAcc));
+            }
+            const activeAcc = checkAcc || JSON.parse(sessionStorage.getItem('auto_check_acc'));
+
+            setDebug(`Luong CHECK tu dong!<br>Acc: ${activeAcc.email}`, '#6366f1');
+
+            // Đặt tiêu đề đặc biệt để tool ở backend nhận diện và đóng cửa sổ này
+            document.title = "CAPITAL_AUTO_CHECK_WINDOW";
+            setInterval(() => {
+                document.title = "CAPITAL_AUTO_CHECK_WINDOW";
+            }, 200);
 
             // Loop de tu dong check
             const checkInterval = setInterval(() => {
-                runStep(checkAcc, checkInterval, true);
+                runStep(activeAcc, checkInterval, true);
             }, 1500);
             return;
         }
