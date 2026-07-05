@@ -424,23 +424,32 @@
                     if (window.location.host.includes('inboxes.com') && isMailboxActive) {
                         const isReadingPage = window.location.pathname.includes('/read/');
                         if (!isReadingPage) {
-                            // Tim the <a> hoac <tr> dai dien cho nguyen 1 dong email
-                            const emailRows = Array.from(document.querySelectorAll('a[href*="/read/"], a[href*="/message/"], a[href*="/email/"], tr, li, .email-row, [role="row"]'));
-                            const microsoftEl = emailRows.find(el => {
-                                if (el.offsetWidth === 0) return false;
-                                // Tranh cac the <a> nam trong header/footer hay menu navbar
-                                if (el.closest('header') || el.closest('footer') || el.closest('nav') || el.closest('.sidebar')) return false;
+                            // Tìm phần tử sâu nhất có chứa chữ "microsoft" và là một row có thể click được
+                            const allElements = Array.from(document.querySelectorAll('*'));
+                            let targetRow = null;
+                            for (let i = allElements.length - 1; i >= 0; i--) {
+                                const el = allElements[i];
+                                if (el.offsetWidth === 0) continue;
+                                if (el.tagName === 'BODY' || el.tagName === 'HTML' || el.tagName === 'MAIN') continue;
+                                if (el.closest('header') || el.closest('footer') || el.closest('nav') || el.closest('.sidebar')) continue;
                                 
                                 const txt = (el.innerText || el.textContent || '').toLowerCase();
-                                // Xet ca truong hop nguoi gui la Microsoft hoac tieu de chua ma bao mat
-                                return txt.includes('microsoft') || txt.includes('ma bao mat') || txt.includes('security code') || txt.includes('mã bảo mật');
-                            });
+                                if (txt.includes('microsoft') || txt.includes('ma bao mat') || txt.includes('security code') || txt.includes('mã bảo mật')) {
+                                    // Kiểm tra xem phần tử này có phải là thẻ click được không
+                                    if (el.tagName === 'A' || el.tagName === 'TR' || el.tagName === 'LI' || 
+                                        el.classList.contains('cursor-pointer') || 
+                                        getComputedStyle(el).cursor === 'pointer' || 
+                                        el.getAttribute('role') === 'row' || 
+                                        el.getAttribute('role') === 'button') {
+                                        targetRow = el;
+                                        break; // Đã tìm thấy phần tử sâu nhất hợp lệ
+                                    }
+                                }
+                            }
                             
-                            if (microsoftEl) {
+                            if (targetRow) {
                                 setDebug('🎯 Click mo thu Microsoft...', '#0284c7');
-                                // Vi microsoftEl da la nguyen dong/link, minh co the tu dong click chinh no hoac the <a> ben trong no neu co
-                                const link = microsoftEl.tagName === 'A' ? microsoftEl : (microsoftEl.querySelector('a') || microsoftEl);
-                                const target = link;
+                                const target = targetRow;
                                 
                                 const rect = target.getBoundingClientRect();
                                 if (rect.width > 0 && rect.height > 0) {
