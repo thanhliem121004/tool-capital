@@ -75,8 +75,9 @@ export async function POST(request: NextRequest) {
         const recovery = String(r?.[12] ?? '').trim();    // Cột M: Mail khôi phục mới
         const newMkCapital = String(r?.[13] ?? '').trim(); // Cột N: MK Capital mới
 
-        const isPasswordError = newPassword === 'SAI MẬT KHẨU' || recovery === 'SAI MẬT KHẨU';
-        const isDone = (recovery.length > 0 || newPassword.length > 0 || (newMkCapital.length > 0 && newMkCapital !== 'SAI CAPITAL')) && !isPasswordError;
+        const isPasswordError = newPassword.toUpperCase().includes('SAI MẬT KHẨU') || recovery.toUpperCase().includes('SAI MẬT KHẨU') || newPassword.toUpperCase().includes('SAI CAPITAL');
+        const capitalStr = newMkCapital.toUpperCase();
+        const isDone = (recovery.length > 0 || newPassword.length > 0 || (newMkCapital.length > 0 && !capitalStr.includes('SAI CAPITAL') && !capitalStr.includes('SAI MẬT KHẨU'))) && !isPasswordError;
 
         rows.push({
           rowIndex: i + 2, // hàng 1 là tiêu đề nên +2

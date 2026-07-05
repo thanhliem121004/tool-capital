@@ -958,7 +958,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Nhập MK Hotmail mới..."
-                    className="flex-1 text-sm bg-white border border-gray-300 rounded p-1.5 outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                    className={`flex-1 text-sm bg-white border border-gray-300 rounded p-1.5 outline-none focus:ring-1 focus:ring-blue-500 font-medium ${newPassword === 'SAI MẬT KHẨU MAIL' ? 'bg-red-100 text-red-700' : ''}`}
                   />
                   <button
                     type="button"
@@ -972,6 +972,17 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                   >
                     🎲 Ngẫu nhiên
                   </button>
+                  <label className="flex items-center gap-1 px-2 py-1 bg-red-50 border border-red-200 rounded text-red-600 text-xs font-semibold cursor-pointer hover:bg-red-100 whitespace-nowrap" title="Đánh dấu lỗi Mật khẩu Mail và không lưu MK này">
+                    <input
+                      type="checkbox"
+                      checked={newPassword === 'SAI MẬT KHẨU MAIL'}
+                      onChange={(e) => {
+                        if (e.target.checked) setNewPassword('SAI MẬT KHẨU MAIL');
+                        else setNewPassword('');
+                      }}
+                    />
+                    Sai Mail
+                  </label>
                 </div>
               </div>
               <div>
@@ -989,7 +1000,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                     <button
                       type="button"
                       onClick={() => {
-                        const base = newPassword ? newPassword : generateRandomPassword();
+                        const base = newPassword && newPassword !== 'SAI MẬT KHẨU MAIL' ? newPassword : generateRandomPassword();
                         setNewMkCapital(base + 'A!');
                       }}
                       className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300 whitespace-nowrap"
@@ -998,6 +1009,22 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                       🎲 Ngẫu nhiên
                     </button>
                   )}
+                  <label className="flex items-center gap-1 px-2 py-1 bg-red-50 border border-red-200 rounded text-red-600 text-xs font-semibold cursor-pointer hover:bg-red-100 whitespace-nowrap" title="Đánh dấu lỗi Mật khẩu Capital">
+                    <input
+                      type="checkbox"
+                      checked={isCapitalErrorUI}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setNewMkCapital('SAI MẬT KHẨU CAPITAL');
+                          onUpdated(row.rowIndex, { newMkCapital: 'SAI MẬT KHẨU CAPITAL' });
+                        } else {
+                          setNewMkCapital('');
+                          onUpdated(row.rowIndex, { newMkCapital: '' });
+                        }
+                      }}
+                    />
+                    Sai Capital
+                  </label>
                 </div>
               </div>
             </div>
