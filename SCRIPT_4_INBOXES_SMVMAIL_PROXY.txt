@@ -424,20 +424,23 @@
                     if (window.location.host.includes('inboxes.com') && isMailboxActive) {
                         const isReadingPage = window.location.pathname.includes('/read/');
                         if (!isReadingPage) {
-                            // Tìm thẻ div hoặc span chứa "microsoft"
-                            const emailElements = Array.from(document.querySelectorAll('div, span, td, p, h2, h3, h4'));
-                            const microsoftEl = emailElements.find(el => {
+                            // Tim the <a> hoac <tr> dai dien cho nguyen 1 dong email
+                            const emailRows = Array.from(document.querySelectorAll('a[href*="/read/"], a[href*="/message/"], a[href*="/email/"], tr, li, .email-row, [role="row"]'));
+                            const microsoftEl = emailRows.find(el => {
                                 if (el.offsetWidth === 0) return false;
-                                const txt = (el.textContent || '').trim().toLowerCase();
-                                return txt.includes('microsoft') && !el.closest('header') && !el.closest('footer');
+                                // Tranh cac the <a> nam trong header/footer hay menu navbar
+                                if (el.closest('header') || el.closest('footer') || el.closest('nav') || el.closest('.sidebar')) return false;
+                                
+                                const txt = (el.innerText || el.textContent || '').toLowerCase();
+                                // Xet ca truong hop nguoi gui la Microsoft hoac tieu de chua ma bao mat
+                                return txt.includes('microsoft') || txt.includes('ma bao mat') || txt.includes('security code') || txt.includes('mã bảo mật');
                             });
                             
                             if (microsoftEl) {
                                 setDebug('🎯 Click mo thu Microsoft...', '#0284c7');
-                                // Tìm thẻ a gần nhất hoặc tr gần nhất
-                                const link = microsoftEl.closest('a');
-                                const row = microsoftEl.closest('tr, li, .email-row');
-                                const target = link || row || microsoftEl;
+                                // Vi microsoftEl da la nguyen dong/link, minh co the tu dong click chinh no hoac the <a> ben trong no neu co
+                                const link = microsoftEl.tagName === 'A' ? microsoftEl : (microsoftEl.querySelector('a') || microsoftEl);
+                                const target = link;
                                 
                                 const rect = target.getBoundingClientRect();
                                 if (rect.width > 0 && rect.height > 0) {
