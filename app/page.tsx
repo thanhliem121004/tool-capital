@@ -262,7 +262,7 @@ export default function Home() {
             sheetName,
             rowIndex: row.rowIndex,
             email: row.email,
-            mkCapital: row.mkCapital || row.password,
+            mkCapital: mode === 'capital' ? row.mkCapital : (row.mkCapital || row.password),
           }),
         });
         const data = await res.json();
@@ -379,19 +379,19 @@ export default function Home() {
               {/* Mode Toggle */}
               <div className="flex bg-gray-200 p-1 rounded-lg mr-2">
                 <button
-                  onClick={() => { setMode('default'); setSelectedName(''); }}
+                  onClick={() => { setMode('default'); setSelectedName(''); localStorage.setItem('sheetMode', 'default'); }}
                   className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${mode === 'default' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
                 >
                   Mặc định
                 </button>
                 <button
-                  onClick={() => { setMode('capital'); setSelectedName('Capital'); }}
+                  onClick={() => { setMode('capital'); setSelectedName('Capital'); localStorage.setItem('sheetMode', 'capital'); }}
                   className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${mode === 'capital' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
                 >
                   Capital One
                 </button>
                 <button
-                  onClick={() => { setMode('mercury' as any); setSelectedName('Mercury'); }}
+                  onClick={() => { setMode('mercury' as any); setSelectedName('Mercury'); localStorage.setItem('sheetMode', 'mercury'); }}
                   className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${mode === ('mercury' as any) ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
                 >
                   Mercury Reg
