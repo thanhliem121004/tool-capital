@@ -283,36 +283,42 @@
                             return;
                         }
 
-                        // Tìm tất cả phần tử có khả năng là nút
-                        const elements = Array.from(document.querySelectorAll('button, a, div, span, input[type="submit"], .primary-btn-large'));
-                        const saveBtn = elements.find(el => {
-                            if (el.offsetWidth === 0) return false;
-                            const txt = (el.textContent || el.value || '').trim().toLowerCase();
-                            // Chính xác chữ 'change password' hoặc class primary
-                            return txt === 'change password' || 
-                                   (txt.includes('change password') && !txt.includes('change your password')) ||
-                                   el.classList.contains('primary-btn-large');
-                        });
+                        // Cách 1: Tìm bằng class đặc trưng
+                        let saveBtn = document.querySelector('button.primary-btn-large, .primary-btn-large');
+                        
+                        // Cách 2: Tìm tất cả các thẻ và lọc theo text
+                        if (!saveBtn || saveBtn.offsetWidth === 0) {
+                            const elements = Array.from(document.querySelectorAll('*'));
+                            saveBtn = elements.find(el => {
+                                if (el.offsetWidth === 0) return false;
+                                // Bỏ qua body, html, form, div bọc ngoài quá lớn
+                                if (['BODY', 'HTML', 'FORM'].includes(el.tagName)) return false;
+                                if (el.children.length > 2) return false; // Thẻ chứa chữ thường không có quá nhiều thẻ con
+                                
+                                const txt = (el.textContent || el.value || '').trim().toLowerCase();
+                                return txt === 'change password';
+                            });
+                        }
 
                         if (saveBtn) {
                             setDebug('💾 Click [Change Password]...', '#16a34a');
-                            const rect = saveBtn.getBoundingClientRect();
+                            const target = saveBtn.closest('button') || saveBtn;
+                            const rect = target.getBoundingClientRect();
                             if (rect.width > 0 && rect.height > 0) {
                                 const cx = rect.left + rect.width / 2;
                                 const cy = rect.top + rect.height / 2;
                                 const opts = { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy };
-                                saveBtn.focus();
-                                saveBtn.dispatchEvent(new PointerEvent('pointerdown', opts));
-                                saveBtn.dispatchEvent(new MouseEvent('mousedown', opts));
-                                saveBtn.dispatchEvent(new PointerEvent('pointerup', opts));
-                                saveBtn.dispatchEvent(new MouseEvent('mouseup', opts));
-                                saveBtn.dispatchEvent(new MouseEvent('click', opts));
-                                saveBtn.click();
+                                target.focus();
+                                target.dispatchEvent(new PointerEvent('pointerdown', opts));
+                                target.dispatchEvent(new MouseEvent('mousedown', opts));
+                                target.dispatchEvent(new PointerEvent('pointerup', opts));
+                                target.dispatchEvent(new MouseEvent('mouseup', opts));
+                                target.dispatchEvent(new MouseEvent('click', opts));
+                                target.click();
                             } else {
-                                safeClick(saveBtn); // Fallback
+                                target.click();
                             }
                             
-                            // Tạm thời clear interval, để vòng lặp chính xử lý tiếp
                             clearInterval(window._saveBtnInterval);
                             window._saveBtnInterval = null;
                         }

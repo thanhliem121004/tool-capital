@@ -5,7 +5,7 @@ export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
   try {
-    const { sheetId, sheetName = 'Sheet1', rowIndex, mode = 'default' } = await request.json();
+    const { sheetId, sheetName = 'Sheet1', rowIndex, mode = 'default', errorType = 'mail' } = await request.json();
 
     if (!sheetId || !rowIndex) {
       return NextResponse.json(
@@ -52,15 +52,27 @@ export async function POST(request: NextRequest) {
 
     // 2. GHI CHỮ "SAI MẬT KHẨU" VÀO SHEET
     if (mode === 'capital') {
-      // Ở chế độ capital: Ghi chữ "SAI MẬT KHẨU" vào cột L (Mật khẩu Hotmail mới)
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: sheetId,
-        range: `'${sheetName}'!L${rowIndex}`,
-        valueInputOption: 'RAW',
-        requestBody: {
-          values: [['SAI MẬT KHẨU']]
-        },
-      });
+      if (errorType === 'capital') {
+        // Sai Capital -> Ghi vào cột N (MK Capital mới)
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: sheetId,
+          range: `'${sheetName}'!N${rowIndex}`,
+          valueInputOption: 'RAW',
+          requestBody: {
+            values: [['SAI MẬT KHẨU CAPITAL']]
+          },
+        });
+      } else {
+        // Sai Mail -> Ghi vào cột L (Mật khẩu Hotmail mới)
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: sheetId,
+          range: `'${sheetName}'!L${rowIndex}`,
+          valueInputOption: 'RAW',
+          requestBody: {
+            values: [['SAI MẬT KHẨU MAIL']]
+          },
+        });
+      }
     } else {
       // Ở chế độ default: Ghi chữ "SAI MẬT KHẨU" vào cột E (Mail khôi phục mới)
       await sheets.spreadsheets.values.update({

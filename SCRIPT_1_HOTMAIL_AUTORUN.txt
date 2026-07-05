@@ -404,9 +404,10 @@
         }
 
         const kmsiTitle = document.querySelector('#kmsiTitle, .kmsi');
-        if (kmsiTitle) {
+        const declineBtn = document.querySelector('#declineButton, #idBtn_Back');
+        if (kmsiTitle || declineBtn) {
             // Click "Không" (Don't stay signed in)
-            const noBtn = document.querySelector('#declineButton, #idBtn_Back') ||
+            const noBtn = declineBtn ||
                 Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a, div')).find(el => {
                     if (el.offsetWidth === 0) return false;
                     const txt = (el.textContent || el.value || '').trim().toLowerCase();
@@ -427,7 +428,7 @@
                     noBtn.dispatchEvent(new MouseEvent('click', opts));
                     noBtn.click();
                 } else {
-                    safeClick(noBtn);
+                    noBtn.click();
                 }
                 clearInterval(interval);
             }

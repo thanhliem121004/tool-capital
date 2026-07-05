@@ -208,7 +208,20 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
             } else {
               setCheckCapitalResult('error');
               setCheckCapitalError(result.error || 'Sai tài khoản/mật khẩu Capital');
-              onUpdated(row.rowIndex, { isPasswordError: true, newPassword: 'SAI CAPITAL' });
+              onUpdated(row.rowIndex, { newPassword: 'SAI CAPITAL' }); // Bỏ isPasswordError: true để không khóa hàng
+              
+              // Tự động ghi "SAI MẬT KHẨU CAPITAL" vào cột N
+              fetch('/api/mark-error', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  sheetId,
+                  sheetName,
+                  rowIndex: row.rowIndex,
+                  mode,
+                  errorType: 'capital'
+                }),
+              }).catch(console.error);
             }
             setCheckingCapital(false);
             return; // Đã nhận được kết quả, thoát hàm
@@ -228,7 +241,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
   };
 
   const handleMarkPasswordError = async () => {
-    if (!window.confirm(`Bạn có chắc chắn muốn đánh dấu dòng #${row.rowIndex} (${row.email}) là SAI MẬT KHẨU và tô đỏ trên Google Sheet không?`)) {
+    if (!window.confirm(`Bạn có chắc chắn muốn đánh dấu dòng #${row.rowIndex} (${row.email}) là SAI MẬT KHẨU MAIL và tô đỏ trên Google Sheet không?`)) {
       return;
     }
     setLoadingMarkError(true);
@@ -242,6 +255,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
           sheetName,
           rowIndex: row.rowIndex,
           mode,
+          errorType: 'mail'
         }),
       });
       const data = await res.json();
@@ -783,7 +797,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
             className="mt-1 px-3 py-2 bg-red-100 text-red-700 rounded border border-red-200 hover:bg-red-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 disabled:cursor-not-allowed transition-colors font-medium text-xs flex items-center h-[38px] justify-center whitespace-nowrap"
             title="Đánh dấu tài khoản bị sai mật khẩu và tô đỏ trên Google Sheet"
           >
-            ❌ {loadingMarkError ? 'Đang lưu...' : 'Sai MK'}
+            ❌ {loadingMarkError ? 'Đang lưu...' : 'Sai MK Mail'}
           </button>
         </div>
         {mode === 'capital' && (
