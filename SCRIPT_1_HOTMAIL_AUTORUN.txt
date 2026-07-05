@@ -392,7 +392,8 @@
         const emailInput = document.querySelector('input[type="email"], input[name="loginfmt"], input#i0116');
         const passInput = document.querySelector('input[type="password"], input[name="passwd"], input#passwordEntry');
 
-        let emailConfirmInput = document.querySelector('input[name="proof"], input#i0027, input#otcEmail, input#emailTxt, input#i0118:not([type="password"])');
+        let emailConfirmInputRaw = document.querySelector('input[name="proof"], input#i0027, input#otcEmail, input#emailTxt, input#i0118:not([type="password"])');
+        let emailConfirmInput = (emailConfirmInputRaw && emailConfirmInputRaw.offsetWidth > 0) ? emailConfirmInputRaw : null;
         if (!emailConfirmInput && sendCodeBtn) {
             emailConfirmInput = Array.from(document.querySelectorAll('input')).find(el =>
                 el.offsetWidth > 0 &&
