@@ -453,11 +453,19 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
       const updates: any = { recovery: data.email };
       if (mode === 'capital') {
         const generatedPass = generateRandomPassword(); // Hotmail mới (không có A!)
-        const generatedCap = generatedPass + 'A!';     // Capital mới (bằng MK Hotmail + 'A!')
         setNewPassword(generatedPass);
-        setNewMkCapital(generatedCap);
         updates.newPassword = generatedPass;
-        updates.newMkCapital = generatedCap;
+        
+        // Chỉ tạo pass Capital mới nếu KHÔNG bị lỗi Capital
+        const isCapitalError = checkCapitalResult === 'error' || row.newMkCapital === 'SAI CAPITAL' || row.newMkCapital === 'SAI MẬT KHẨU CAPITAL';
+        if (!isCapitalError) {
+          const generatedCap = generatedPass + 'A!';     // Capital mới (bằng MK Hotmail + 'A!')
+          setNewMkCapital(generatedCap);
+          updates.newMkCapital = generatedCap;
+        } else {
+          // Giữ nguyên lỗi
+          updates.newMkCapital = row.newMkCapital;
+        }
       }
       onUpdated(row.rowIndex, updates);
     } catch (e) {
