@@ -422,41 +422,23 @@
 
                     // 2. Kiem tra va tu dong click mo email Microsoft neu dang o trang danh sach
                     if (window.location.host.includes('inboxes.com') && isMailboxActive) {
-                        const emailRow = Array.from(document.querySelectorAll('td, tr, li, div, span, p, a, h1, h2, h3, h4, h5, h6')).find(el => {
-                            const txt = (el.textContent || '').trim().toLowerCase();
-                            const isMicrosoftEmail = txt.includes('microsoft') && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE';
-                            return el.offsetWidth > 0 && isMicrosoftEmail && !el.closest('header') && !el.closest('footer') && !el.closest('.loading') && !el.closest('#footer-note');
-                        });
-
-                        if (emailRow) {
-                            const isReadingPage = window.location.pathname.includes('/read/');
-                            if (!isReadingPage) {
-                                setDebug('Phat hien thu Microsoft trong danh sach. Dang mo thu...', '#0284c7');
-                                
-                                // Tim the <a> co href gan nhat, duyet tu emailRow len cha
-                                let linkEl = null;
-                                let node = emailRow;
-                                while (node && node !== document.body) {
-                                    if (node.tagName === 'A' && node.href) {
-                                        linkEl = node;
-                                        break;
-                                    }
-                                    const childLink = node.querySelector('a[href]');
-                                    if (childLink) {
-                                        linkEl = childLink;
-                                        break;
-                                    }
-                                    node = node.parentElement;
-                                }
-                                
-                                if (linkEl && linkEl.href) {
-                                    // Dung window.location de chuyen trang truc tiep
-                                    setDebug('Dang mo thu voi link: ' + linkEl.href.substring(0, 60) + '...', '#0284c7');
-                                    window.location.href = linkEl.href;
-                                } else {
-                                    // Fallback: thu click truc tiep
-                                    safeClick(emailRow);
-                                }
+                        const isReadingPage = window.location.pathname.includes('/read/');
+                        if (!isReadingPage) {
+                            // Cach 1: Tim truc tiep the <a> co text chua "microsoft" va co href
+                            let emailLink = Array.from(document.querySelectorAll('a[href]')).find(a => {
+                                const txt = (a.textContent || '').trim().toLowerCase();
+                                return a.offsetWidth > 0 && txt.includes('microsoft') && 
+                                       !a.closest('header') && !a.closest('footer');
+                            });
+                            
+                            // Cach 2: Tim the <a> co href chua "/read/" (link mo thu)
+                            if (!emailLink) {
+                                emailLink = Array.from(document.querySelectorAll('a[href*="/read/"]')).find(a => a.offsetWidth > 0);
+                            }
+                            
+                            if (emailLink && emailLink.href) {
+                                setDebug('Mo thu Microsoft: ' + emailLink.href.substring(0, 60) + '...', '#0284c7');
+                                window.location.href = emailLink.href;
                                 return;
                             }
                         }

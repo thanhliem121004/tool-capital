@@ -2,11 +2,6 @@
      DANH SACH 6 SCRIPT TAMPERMONKEY CAN CAI DAT (DONG BO 100% KHONG LOI)
 ========================================================================
 
-Ban can cai dat ca 6 script duoi day vao Tampermonkey de he thong tu dong hoa hoat dong tron tru.
-Co the copy tung phan duoi day va add moi vao Tampermonkey.
-
-========================================================================
-
 ========================================================================
   1. SCRIPT 1: HOTMAIL AUTO LOGIN & ADD RECOVERY (AUTO RUN)
 ========================================================================
@@ -1272,30 +1267,32 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
             const newPassInput = document.getElementById('id_newPassword') || document.querySelector('input[name="newPassword"]');
 
             if (currentPassInput && currentPassInput.offsetWidth > 0 && newPassInput && newPassInput.offsetWidth > 0) {
-                if (currentPassInput.value !== acc.mkCapital) {
-                    setDebug('🔑 Dien Current Password (MK cu)...', '#0284c7');
-                    safeFill(currentPassInput, acc.mkCapital);
-                }
-                
-                if (newPassInput.value !== acc.newMkCapital) {
-                    setDebug('✨ Dien New Password (MK MOI)...', '#0284c7');
-                    safeFill(newPassInput, acc.newMkCapital);
-                }
+                // Điền mật khẩu
+                safeFill(currentPassInput, acc.mkCapital);
+                safeFill(newPassInput, acc.newMkCapital);
 
-                if (currentPassInput.value.length > 0 && newPassInput.value.length > 0) {
-                    // Tìm nút "Change Password" (nút xanh lớn ở cuối form) - ưu tiên class chính xác
-                    const saveBtn = document.querySelector('button.primary-btn-large') ||
-                        Array.from(document.querySelectorAll('button')).find(btn => {
-                            const txt = (btn.textContent || '').trim().toLowerCase();
-                            const cls = (btn.className || '').toString().toLowerCase();
-                            // CHỈ match nút có chữ "change password" (không match nút "Change" mở form)
-                            return (txt === 'change password' || txt.includes('change password')) && 
-                                   cls.includes('primary');
-                        });
-                    if (saveBtn && saveBtn.offsetWidth > 0) {
-                        setDebug('💾 Click [Change Password] luu mat khau moi...', '#16a34a');
-                        safeClick(saveBtn);
-                    }
+                // Tìm nút "Change Password" (nút xanh lớn cuối form) sau 500ms để React kịp xử lý
+                if (!window._saveBtnClicked) {
+                    window._saveBtnClicked = true;
+                    setTimeout(() => {
+                        const saveBtn = document.querySelector('button.primary-btn-large') ||
+                            Array.from(document.querySelectorAll('button')).find(btn => {
+                                const txt = (btn.textContent || '').trim().toLowerCase();
+                                return txt === 'change password' || txt.includes('change password');
+                            });
+                        if (saveBtn && saveBtn.offsetWidth > 0) {
+                            setDebug('💾 Click [Change Password] luu mat khau moi...', '#16a34a');
+                            // Click nhiều cách để đảm bảo React bắt được
+                            saveBtn.focus();
+                            saveBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                            saveBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                            saveBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                            saveBtn.click();
+                        } else {
+                            setDebug('⚠️ Khong tim thay nut Change Password!', '#eab308');
+                        }
+                        window._saveBtnClicked = false;
+                    }, 500);
                 }
                 
                 // Tránh trùng lặp interval kiểm tra đổi mật khẩu thành công
@@ -1873,41 +1870,23 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
 
                     // 2. Kiem tra va tu dong click mo email Microsoft neu dang o trang danh sach
                     if (window.location.host.includes('inboxes.com') && isMailboxActive) {
-                        const emailRow = Array.from(document.querySelectorAll('td, tr, li, div, span, p, a, h1, h2, h3, h4, h5, h6')).find(el => {
-                            const txt = (el.textContent || '').trim().toLowerCase();
-                            const isMicrosoftEmail = txt.includes('microsoft') && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE';
-                            return el.offsetWidth > 0 && isMicrosoftEmail && !el.closest('header') && !el.closest('footer') && !el.closest('.loading') && !el.closest('#footer-note');
-                        });
-
-                        if (emailRow) {
-                            const isReadingPage = window.location.pathname.includes('/read/');
-                            if (!isReadingPage) {
-                                setDebug('Phat hien thu Microsoft trong danh sach. Dang mo thu...', '#0284c7');
-                                
-                                // Tim the <a> co href gan nhat, duyet tu emailRow len cha
-                                let linkEl = null;
-                                let node = emailRow;
-                                while (node && node !== document.body) {
-                                    if (node.tagName === 'A' && node.href) {
-                                        linkEl = node;
-                                        break;
-                                    }
-                                    const childLink = node.querySelector('a[href]');
-                                    if (childLink) {
-                                        linkEl = childLink;
-                                        break;
-                                    }
-                                    node = node.parentElement;
-                                }
-                                
-                                if (linkEl && linkEl.href) {
-                                    // Dung window.location de chuyen trang truc tiep
-                                    setDebug('Dang mo thu voi link: ' + linkEl.href.substring(0, 60) + '...', '#0284c7');
-                                    window.location.href = linkEl.href;
-                                } else {
-                                    // Fallback: thu click truc tiep
-                                    safeClick(emailRow);
-                                }
+                        const isReadingPage = window.location.pathname.includes('/read/');
+                        if (!isReadingPage) {
+                            // Cach 1: Tim truc tiep the <a> co text chua "microsoft" va co href
+                            let emailLink = Array.from(document.querySelectorAll('a[href]')).find(a => {
+                                const txt = (a.textContent || '').trim().toLowerCase();
+                                return a.offsetWidth > 0 && txt.includes('microsoft') && 
+                                       !a.closest('header') && !a.closest('footer');
+                            });
+                            
+                            // Cach 2: Tim the <a> co href chua "/read/" (link mo thu)
+                            if (!emailLink) {
+                                emailLink = Array.from(document.querySelectorAll('a[href*="/read/"]')).find(a => a.offsetWidth > 0);
+                            }
+                            
+                            if (emailLink && emailLink.href) {
+                                setDebug('Mo thu Microsoft: ' + emailLink.href.substring(0, 60) + '...', '#0284c7');
+                                window.location.href = emailLink.href;
                                 return;
                             }
                         }

@@ -268,30 +268,32 @@
             const newPassInput = document.getElementById('id_newPassword') || document.querySelector('input[name="newPassword"]');
 
             if (currentPassInput && currentPassInput.offsetWidth > 0 && newPassInput && newPassInput.offsetWidth > 0) {
-                if (currentPassInput.value !== acc.mkCapital) {
-                    setDebug('🔑 Dien Current Password (MK cu)...', '#0284c7');
-                    safeFill(currentPassInput, acc.mkCapital);
-                }
-                
-                if (newPassInput.value !== acc.newMkCapital) {
-                    setDebug('✨ Dien New Password (MK MOI)...', '#0284c7');
-                    safeFill(newPassInput, acc.newMkCapital);
-                }
+                // Điền mật khẩu
+                safeFill(currentPassInput, acc.mkCapital);
+                safeFill(newPassInput, acc.newMkCapital);
 
-                if (currentPassInput.value.length > 0 && newPassInput.value.length > 0) {
-                    // Tìm nút "Change Password" (nút xanh lớn ở cuối form) - ưu tiên class chính xác
-                    const saveBtn = document.querySelector('button.primary-btn-large') ||
-                        Array.from(document.querySelectorAll('button')).find(btn => {
-                            const txt = (btn.textContent || '').trim().toLowerCase();
-                            const cls = (btn.className || '').toString().toLowerCase();
-                            // CHỈ match nút có chữ "change password" (không match nút "Change" mở form)
-                            return (txt === 'change password' || txt.includes('change password')) && 
-                                   cls.includes('primary');
-                        });
-                    if (saveBtn && saveBtn.offsetWidth > 0) {
-                        setDebug('💾 Click [Change Password] luu mat khau moi...', '#16a34a');
-                        safeClick(saveBtn);
-                    }
+                // Tìm nút "Change Password" (nút xanh lớn cuối form) sau 500ms để React kịp xử lý
+                if (!window._saveBtnClicked) {
+                    window._saveBtnClicked = true;
+                    setTimeout(() => {
+                        const saveBtn = document.querySelector('button.primary-btn-large') ||
+                            Array.from(document.querySelectorAll('button')).find(btn => {
+                                const txt = (btn.textContent || '').trim().toLowerCase();
+                                return txt === 'change password' || txt.includes('change password');
+                            });
+                        if (saveBtn && saveBtn.offsetWidth > 0) {
+                            setDebug('💾 Click [Change Password] luu mat khau moi...', '#16a34a');
+                            // Click nhiều cách để đảm bảo React bắt được
+                            saveBtn.focus();
+                            saveBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                            saveBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                            saveBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                            saveBtn.click();
+                        } else {
+                            setDebug('⚠️ Khong tim thay nut Change Password!', '#eab308');
+                        }
+                        window._saveBtnClicked = false;
+                    }, 500);
                 }
                 
                 // Tránh trùng lặp interval kiểm tra đổi mật khẩu thành công
