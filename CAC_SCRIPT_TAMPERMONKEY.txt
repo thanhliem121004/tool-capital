@@ -1313,15 +1313,11 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
                                 return;
                             }
 
-                            // 2. Kiểm tra xem các ô nhập mật khẩu đã biến mất HOẶC có chữ Success/Changed/Saved/Updated
+                            // 2. Kiểm tra xem các ô nhập mật khẩu đã thực sự biến mất khỏi màn hình (form đóng lại)
                             const currentInput = document.getElementById('id_currentPassword') || document.querySelector('input[name="currentPassword"]');
                             const isInputsGone = !currentInput || currentInput.offsetWidth === 0;
-                            const isSuccessText = bodyText.includes('success') || 
-                                                  bodyText.includes('changed') || 
-                                                  bodyText.includes('saved') || 
-                                                  bodyText.includes('updated');
 
-                            if (isInputsGone || isSuccessText || checkCount >= 16) { // Chờ tối đa 8 giây (16 * 500ms)
+                            if (isInputsGone || checkCount >= 16) { // Chờ tối đa 8 giây (16 * 500ms)
                                 clearInterval(checkSuccessInterval);
                                 setDebug('🎉 Đổi mật khẩu Capital thành công!', '#16a34a');
                                 reportResult(acc, 'ok');
@@ -1884,8 +1880,9 @@ Co the copy tung phan duoi day va add moi vao Tampermonkey.
                             const isReadingPage = window.location.pathname.includes('/read/');
                             if (!isReadingPage) {
                                 setDebug('Phat hien thu Microsoft trong danh sach. Dang mo thu...', '#0284c7');
-                                // Tìm thẻ click tr: Hàng bảng chứa dòng thư, hoặc td, hoặc li, hoặc div bọc ngoài, hoặc a
-                                const targetBtn = emailRow.closest('tr') || emailRow.closest('td') || emailRow.closest('li') || emailRow.closest('a') || emailRow;
+                                // Tìm thẻ tr / li chứa dòng thư, sau đó ưu tiên click vào thẻ a (liên kết) bên trong
+                                const parentRow = emailRow.closest('tr') || emailRow.closest('li') || emailRow;
+                                const targetBtn = parentRow.querySelector('a') || parentRow;
                                 safeClick(targetBtn);
                                 return; // Cho trang doc thu load
                             }

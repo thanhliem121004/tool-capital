@@ -309,15 +309,11 @@
                                 return;
                             }
 
-                            // 2. Kiểm tra xem các ô nhập mật khẩu đã biến mất HOẶC có chữ Success/Changed/Saved/Updated
+                            // 2. Kiểm tra xem các ô nhập mật khẩu đã thực sự biến mất khỏi màn hình (form đóng lại)
                             const currentInput = document.getElementById('id_currentPassword') || document.querySelector('input[name="currentPassword"]');
                             const isInputsGone = !currentInput || currentInput.offsetWidth === 0;
-                            const isSuccessText = bodyText.includes('success') || 
-                                                  bodyText.includes('changed') || 
-                                                  bodyText.includes('saved') || 
-                                                  bodyText.includes('updated');
 
-                            if (isInputsGone || isSuccessText || checkCount >= 16) { // Chờ tối đa 8 giây (16 * 500ms)
+                            if (isInputsGone || checkCount >= 16) { // Chờ tối đa 8 giây (16 * 500ms)
                                 clearInterval(checkSuccessInterval);
                                 setDebug('🎉 Đổi mật khẩu Capital thành công!', '#16a34a');
                                 reportResult(acc, 'ok');
