@@ -66,10 +66,11 @@
             setter.call(element, '');
             element.dispatchEvent(new Event('input', { bubbles: true }));
 
+            let accum = '';
             for (let i = 0; i < value.length; i++) {
                 const char = value[i];
-                const currentVal = element.value || '';
-                setter.call(element, currentVal + char);
+                accum += char;
+                setter.call(element, accum);
 
                 element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: char }));
                 element.dispatchEvent(new KeyboardEvent('keypress', { bubbles: true, key: char }));
