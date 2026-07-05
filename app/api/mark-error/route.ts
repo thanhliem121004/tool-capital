@@ -5,7 +5,7 @@ export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
   try {
-    const { sheetId, sheetName = 'Sheet1', rowIndex, mode = 'default', errorType = 'mail' } = await request.json();
+    const { sheetId, sheetName = 'Sheet1', rowIndex, mode = 'default', errorType = 'mail', newMkCapital } = await request.json();
 
     if (!sheetId || !rowIndex) {
       return NextResponse.json(
@@ -72,6 +72,18 @@ export async function POST(request: NextRequest) {
             values: [['SAI MẬT KHẨU MAIL']]
           },
         });
+        
+        // Nếu có mk capital mới (user đã đổi pass Capital thành công nhưng mail lỗi) -> Lưu mk capital mới vào N
+        if (newMkCapital) {
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: sheetId,
+            range: `'${sheetName}'!N${rowIndex}`,
+            valueInputOption: 'RAW',
+            requestBody: {
+              values: [[newMkCapital]]
+            },
+          });
+        }
       }
     } else {
       // Ở chế độ default: Ghi chữ "SAI MẬT KHẨU" vào cột E (Mail khôi phục mới)

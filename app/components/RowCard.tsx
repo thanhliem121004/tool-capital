@@ -255,7 +255,8 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
           sheetName,
           rowIndex: row.rowIndex,
           mode,
-          errorType: 'mail'
+          errorType: 'mail',
+          newMkCapital: newMkCapital || row.newMkCapital
         }),
       });
       const data = await res.json();
@@ -1009,7 +1010,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
             </div>
           )}
           
-          {!isDone && (
+          {!isDone && !isPasswordError && (
             <button
               onClick={handleComplete}
               disabled={loadingComplete}
