@@ -278,64 +278,18 @@
             // Luong doi mat khau
             const currentPassInput = document.getElementById('id_currentPassword') || document.querySelector('input[name="currentPassword"]');
             const newPassInput = document.getElementById('id_newPassword') || document.querySelector('input[name="newPassword"]');
-
             if (currentPassInput && currentPassInput.offsetWidth > 0 && newPassInput && newPassInput.offsetWidth > 0) {
-                // Điền mật khẩu
-                safeFill(currentPassInput, acc.mkCapital);
-                safeFill(newPassInput, acc.newMkCapital);
-
-                // Tìm nút "Change Password" bằng interval để chắc chắn bắt được khi React render xong
-                if (!window._saveBtnInterval) {
-                    window._saveBtnInterval = setInterval(() => {
-                        // Bỏ qua nếu form đã đóng (input biến mất)
-                        const currentInput = document.getElementById('id_currentPassword') || document.querySelector('input[name="currentPassword"]');
-                        if (!currentInput || currentInput.offsetWidth === 0) {
-                            clearInterval(window._saveBtnInterval);
-                            window._saveBtnInterval = null;
-                            return;
-                        }
-
-                        // Cách 1: Tìm bằng class đặc trưng
-                        let saveBtn = document.querySelector('button.primary-btn-large, .primary-btn-large');
-                        
-                        // Cách 2: Tìm tất cả các thẻ và lọc theo text
-                        if (!saveBtn || saveBtn.offsetWidth === 0) {
-                            const elements = Array.from(document.querySelectorAll('*'));
-                            saveBtn = elements.find(el => {
-                                if (el.offsetWidth === 0) return false;
-                                // Bỏ qua body, html, form, div bọc ngoài quá lớn
-                                if (['BODY', 'HTML', 'FORM'].includes(el.tagName)) return false;
-                                if (el.children.length > 2) return false; // Thẻ chứa chữ thường không có quá nhiều thẻ con
-                                
-                                const txt = (el.textContent || el.value || '').trim().toLowerCase();
-                                return txt === 'change password';
-                            });
-                        }
-
-                        if (saveBtn) {
-                            setDebug('💾 Click [Change Password]...', '#16a34a');
-                            const target = saveBtn.closest('button') || saveBtn;
-                            const rect = target.getBoundingClientRect();
-                            if (rect.width > 0 && rect.height > 0) {
-                                const cx = rect.left + rect.width / 2;
-                                const cy = rect.top + rect.height / 2;
-                                const opts = { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy };
-                                target.focus();
-                                target.dispatchEvent(new PointerEvent('pointerdown', opts));
-                                target.dispatchEvent(new MouseEvent('mousedown', opts));
-                                target.dispatchEvent(new PointerEvent('pointerup', opts));
-                                target.dispatchEvent(new MouseEvent('mouseup', opts));
-                                target.dispatchEvent(new MouseEvent('click', opts));
-                                target.click();
-                            } else {
-                                target.click();
-                            }
-                            
-                            clearInterval(window._saveBtnInterval);
-                            window._saveBtnInterval = null;
-                        }
-                    }, 500);
+                // Điền mật khẩu (chỉ điền nếu chưa đúng)
+                if (currentPassInput.value !== acc.mkCapital) {
+                    safeFill(currentPassInput, acc.mkCapital);
                 }
+                if (newPassInput.value !== acc.newMkCapital) {
+                    safeFill(newPassInput, acc.newMkCapital);
+                }
+                
+                // Đã bỏ tính năng tự động click Change Password theo yêu cầu của user
+                setDebug('💾 Đã điền xong mật khẩu. Vui lòng tự nhấn [Change Password]...', '#16a34a');
+            }
                 
                 // Tránh trùng lặp interval kiểm tra đổi mật khẩu thành công
                 if (!window.checkSuccessActive) {
