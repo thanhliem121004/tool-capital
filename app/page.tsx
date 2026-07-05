@@ -96,8 +96,8 @@ export default function Home() {
     setSelectedName(name);
     localStorage.setItem('selectedName', name);
   };
-  const [statusFilter, setStatusFilter] = useState<'all' | 'done' |
-    'not-done'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'done' | 'not-done'>('all');
+  const [capitalFilter, setCapitalFilter] = useState<'all' | 'error' | 'ok'>('all');
   const [searchText, setSearchText] = useState('');
 
   const uniqueNames = useMemo(() => {
@@ -146,6 +146,13 @@ export default function Home() {
       if (mode !== 'capital' && selectedName && selectedName !== 'all' && r.name !== selectedName) return false;
       if (statusFilter === 'done' && !r.isDone) return false;
       if (statusFilter === 'not-done' && r.isDone) return false;
+      
+      if (mode === 'capital') {
+        const isCapitalError = r.newMkCapital === 'SAI CAPITAL' || r.newMkCapital === 'SAI MẬT KHẨU CAPITAL';
+        if (capitalFilter === 'error' && !isCapitalError) return false;
+        if (capitalFilter === 'ok' && isCapitalError) return false;
+      }
+
       if (searchText) {
         const q = searchText.toLowerCase();
         const hay = (r.name + ' ' + r.email + ' ' +
@@ -194,7 +201,7 @@ export default function Home() {
   // Reset trang về 1 khi các bộ lọc thay đổi
   useEffect(() => {
     setCurrentPage(1);
-  }, [mode, selectedName, statusFilter, searchText, pageSize]);
+  }, [mode, selectedName, statusFilter, capitalFilter, searchText, pageSize]);
 
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
 
@@ -601,7 +608,7 @@ export default function Home() {
 
         {rows.length > 0 && mode === 'capital' && (
           <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">📌 Trạng thái:</label>
                 <select
@@ -615,12 +622,24 @@ export default function Home() {
                 </select>
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">⚠️ Capital:</label>
+                <select
+                  value={capitalFilter}
+                  onChange={(e) => setCapitalFilter(e.target.value as 'all' | 'error' | 'ok')}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="all">Tất cả</option>
+                  <option value="ok">✅ Đăng nhập OK</option>
+                  <option value="error">❌ Sai Capital</option>
+                </select>
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">🔎 Tìm kiếm:</label>
                 <input
                   type="text"
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
-                  placeholder="Tìm theo Hotmail, mail khôi phục..."
+                  placeholder="Tìm theo Hotmail..."
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                 />
               </div>
