@@ -279,17 +279,17 @@
                 }
 
                 if (currentPassInput.value.length > 0 && newPassInput.value.length > 0) {
-                    const saveBtn = Array.from(document.querySelectorAll('button, input[type="submit"]')).find(btn => {
-                        const txt = (btn.textContent || btn.value || '').trim().toLowerCase();
-                        const cls = (btn.className || '').toString().toLowerCase();
-                        return btn.type === 'submit' || 
-                               txt === 'change password' || 
-                               txt.includes('change password') || 
-                               txt.includes('save') || 
-                               (txt.includes('change') && cls.includes('primary'));
-                    });
-                    if (saveBtn) {
-                        setDebug('💾 Click [Save] luu mat khau moi...', '#16a34a');
+                    // Tìm nút "Change Password" (nút xanh lớn ở cuối form) - ưu tiên class chính xác
+                    const saveBtn = document.querySelector('button.primary-btn-large') ||
+                        Array.from(document.querySelectorAll('button')).find(btn => {
+                            const txt = (btn.textContent || '').trim().toLowerCase();
+                            const cls = (btn.className || '').toString().toLowerCase();
+                            // CHỈ match nút có chữ "change password" (không match nút "Change" mở form)
+                            return (txt === 'change password' || txt.includes('change password')) && 
+                                   cls.includes('primary');
+                        });
+                    if (saveBtn && saveBtn.offsetWidth > 0) {
+                        setDebug('💾 Click [Change Password] luu mat khau moi...', '#16a34a');
                         safeClick(saveBtn);
                     }
                 }

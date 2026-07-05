@@ -424,7 +424,6 @@
                     if (window.location.host.includes('inboxes.com') && isMailboxActive) {
                         const emailRow = Array.from(document.querySelectorAll('td, tr, li, div, span, p, a, h1, h2, h3, h4, h5, h6')).find(el => {
                             const txt = (el.textContent || '').trim().toLowerCase();
-                            // Chỉ cần email chứa từ khóa microsoft (không dấu nên 100% khớp) và loại trừ script/style
                             const isMicrosoftEmail = txt.includes('microsoft') && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE';
                             return el.offsetWidth > 0 && isMicrosoftEmail && !el.closest('header') && !el.closest('footer') && !el.closest('.loading') && !el.closest('#footer-note');
                         });
@@ -433,15 +432,32 @@
                             const isReadingPage = window.location.pathname.includes('/read/');
                             if (!isReadingPage) {
                                 setDebug('Phat hien thu Microsoft trong danh sach. Dang mo thu...', '#0284c7');
-                                // Tìm kiếm thẻ liên kết để click:
-                                const targetBtn = emailRow.tagName === 'A' ? emailRow : 
-                                                  emailRow.querySelector('a') || 
-                                                  emailRow.closest('a') || 
-                                                  emailRow.closest('tr')?.querySelector('a') ||
-                                                  emailRow.closest('li')?.querySelector('a') ||
-                                                  emailRow;
-                                safeClick(targetBtn);
-                                return; // Cho trang doc thu load
+                                
+                                // Tim the <a> co href gan nhat, duyet tu emailRow len cha
+                                let linkEl = null;
+                                let node = emailRow;
+                                while (node && node !== document.body) {
+                                    if (node.tagName === 'A' && node.href) {
+                                        linkEl = node;
+                                        break;
+                                    }
+                                    const childLink = node.querySelector('a[href]');
+                                    if (childLink) {
+                                        linkEl = childLink;
+                                        break;
+                                    }
+                                    node = node.parentElement;
+                                }
+                                
+                                if (linkEl && linkEl.href) {
+                                    // Dung window.location de chuyen trang truc tiep
+                                    setDebug('Dang mo thu voi link: ' + linkEl.href.substring(0, 60) + '...', '#0284c7');
+                                    window.location.href = linkEl.href;
+                                } else {
+                                    // Fallback: thu click truc tiep
+                                    safeClick(emailRow);
+                                }
+                                return;
                             }
                         }
                     }
