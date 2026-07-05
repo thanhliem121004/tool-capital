@@ -279,9 +279,14 @@
                 }
 
                 if (currentPassInput.value === acc.mkCapital && newPassInput.value === acc.newMkCapital) {
-                    const saveBtn = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"], [role="button"]')).find(btn => {
+                    const saveBtn = Array.from(document.querySelectorAll('button, input[type="submit"]')).find(btn => {
                         const txt = (btn.textContent || btn.value || '').trim().toLowerCase();
-                        return btn.type === 'submit' || txt.includes('save') || txt.includes('change password') || txt.includes('update') || txt.includes('submit');
+                        const cls = (btn.className || '').toString().toLowerCase();
+                        return btn.type === 'submit' || 
+                               txt === 'change password' || 
+                               txt.includes('change password') || 
+                               txt.includes('save') || 
+                               (txt.includes('change') && cls.includes('primary'));
                     });
                     if (saveBtn) {
                         setDebug('💾 Click [Save] luu mat khau moi...', '#16a34a');
@@ -323,13 +328,9 @@
                 return;
             }
 
-            const changeBtn = Array.from(document.querySelectorAll('button, a, [role="button"]')).find(btn => {
+            const changeBtn = Array.from(document.querySelectorAll('button')).find(btn => {
                 const txt = (btn.textContent || '').trim().toLowerCase();
-                const cls = (btn.className || '').toString().toLowerCase();
-                return txt === 'change' || 
-                       txt === 'change password' || 
-                       txt.includes('change password') ||
-                       (txt.includes('change') && (cls.includes('btn') || cls.includes('button') || cls.includes('large')));
+                return txt === 'change' || (btn.classList.contains('secondary-btn-large') && txt.includes('change')) || (btn.className && typeof btn.className === 'string' && btn.className.includes('secondary-btn') && txt.includes('change'));
             });
 
             if (changeBtn && changeBtn.offsetWidth > 0) {
