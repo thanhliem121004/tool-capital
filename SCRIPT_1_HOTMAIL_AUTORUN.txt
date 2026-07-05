@@ -702,59 +702,54 @@
                    isOldRecoveryEmail(el.textContent, acc);
         });
 
+        const isRelatedTo = (element, targetEl, excludeText) => {
+            let p = element.parentElement;
+            while (p && p.tagName !== 'BODY') {
+                if (p.contains(targetEl)) {
+                    // It is a common ancestor! Check if it also contains the excluded text (meaning we went too high up into the list container)
+                    const txt = p.innerText || '';
+                    if (excludeText && txt.toLowerCase().includes(excludeText.toLowerCase())) {
+                        return false;
+                    }
+                    return true;
+                }
+                p = p.parentElement;
+            }
+            return false;
+        };
+
         if (hasNewRecoveryOnPage && emailElements.length > 0) {
             hasOldRecoveryOnPage = true;
             for (const emailEl of emailElements) {
-                let current = emailEl.parentElement;
-                let removeBtn = null;
-                let expandBtn = null;
+                // Find all Remove buttons
+                const allRemoveBtns = Array.from(document.querySelectorAll('button, a')).filter(btn => {
+                    if (btn.children.length > 0 && !btn.id) return false;
+                    const txt = (btn.textContent || btn.value || '').trim().toLowerCase();
+                    return btn.id === 'Remove' || txt === 'xóa' || txt === 'remove';
+                });
+                
+                // Find Remove button related to this emailEl, excluding the Password section
+                const removeBtn = allRemoveBtns.find(btn => btn.offsetWidth > 0 && isRelatedTo(btn, emailEl, 'mật khẩu'));
 
-                // Go up the tree to find the Remove button and the Expand button, but stop if we hit another proof
-                while (current && current.tagName !== 'BODY') {
-                    const txt = current.innerText || '';
-                    // Stop if we reached the main list container (it contains other proofs like Password or the new email)
-                    if (txt.includes('Nhập mật khẩu') || txt.includes('Enter password') || txt.includes('Mật khẩu') || (acc.recovery && txt.toLowerCase().includes(acc.recovery.toLowerCase()))) {
-                        break;
-                    }
-
-                    if (!expandBtn) {
-                        const btn = Array.from(current.querySelectorAll('button, [role="button"], .ms-Icon--ChevronRight, [class*="ChevronRight"], [class*="ChevronDown"]')).find(b => b.offsetWidth > 0);
-                        if (btn) expandBtn = btn;
-                    }
-
-                    if (!removeBtn) {
-                        const btn = Array.from(current.querySelectorAll('button, a')).find(b => {
-                            const bt = (b.textContent || '').trim().toLowerCase();
-                            return b.id === 'Remove' || bt === 'xóa' || bt === 'remove';
-                        });
-                        if (btn && btn.offsetWidth > 0) {
-                            removeBtn = btn;
-                        }
-                    }
-
-                    current = current.parentElement;
-                }
-
-                if (removeBtn && removeBtn.offsetWidth > 0) {
+                if (removeBtn) {
                     setDebug(`🗑️ Click nút Xóa email cũ...`, '#e11d48');
                     safeClick(removeBtn);
                     return;
                 }
 
-                if (expandBtn && expandBtn.offsetWidth > 0) {
+                // If Remove button not visible, find the Chevron or Expand button
+                const allExpandBtns = Array.from(document.querySelectorAll('button, [role="button"], .ms-Icon--ChevronRight, [class*="ChevronRight"], [class*="ChevronDown"]'));
+                const expandBtn = allExpandBtns.find(btn => btn.offsetWidth > 0 && isRelatedTo(btn, emailEl, 'mật khẩu'));
+
+                if (expandBtn) {
                     setDebug(`🔓 Click mở rộng email cũ...`, '#0284c7');
                     safeClick(expandBtn);
-                    return;
-                } else if (emailEl.parentElement) {
-                    // Fallback
-                    safeClick(emailEl.parentElement);
                     return;
                 }
             }
         }
 
         if (hasNewRecoveryOnPage && !hasOldRecoveryOnPage) {
-            // Find Change Password button using the same isolation logic
             const passwordLink = Array.from(document.querySelectorAll('*')).find(el => {
                 if (el.children.length > 0) return false;
                 const txt = (el.textContent || '').trim().toLowerCase();
@@ -762,46 +757,28 @@
             });
 
             if (passwordLink) {
-                let current = passwordLink.parentElement;
-                let changePassBtn = null;
-                let expandBtn = null;
+                // Find all Change Password buttons
+                const allChangePassBtns = Array.from(document.querySelectorAll('button, a')).filter(btn => {
+                    const txt = (btn.textContent || btn.value || '').trim().toLowerCase();
+                    return btn.id === 'ChangePassword' || txt === 'thay đổi mật khẩu' || txt === 'change password';
+                });
+                
+                // Exclude the old email if it still exists (though it shouldn't reach here if it does)
+                const changePassBtn = allChangePassBtns.find(btn => btn.offsetWidth > 0 && isRelatedTo(btn, passwordLink, '@'));
 
-                while (current && current.tagName !== 'BODY') {
-                    const txt = current.innerText || '';
-                    if (txt.includes('@') && txt.includes('.')) {
-                        break; // Reached the list containing emails, too high!
-                    }
-
-                    if (!changePassBtn) {
-                        const btn = Array.from(current.querySelectorAll('button, a')).find(b => {
-                            const bt = (b.textContent || '').trim().toLowerCase();
-                            return b.id === 'ChangePassword' || bt === 'thay đổi mật khẩu' || bt === 'change password';
-                        });
-                        if (btn && btn.offsetWidth > 0) {
-                            changePassBtn = btn;
-                        }
-                    }
-
-                    if (!expandBtn) {
-                        const btn = Array.from(current.querySelectorAll('button, [role="button"], .ms-Icon--ChevronRight, [class*="ChevronRight"], [class*="ChevronDown"]')).find(b => b.offsetWidth > 0 && b.id !== 'ChangePassword' && b.id !== 'Remove');
-                        if (btn) expandBtn = btn;
-                    }
-
-                    current = current.parentElement;
-                }
-
-                if (changePassBtn && changePassBtn.offsetWidth > 0) {
+                if (changePassBtn) {
                     setDebug(`🔑 Click chọn [Thay đổi mật khẩu]...`, '#e11d48');
                     safeClick(changePassBtn);
                     return;
                 }
 
-                if (expandBtn && expandBtn.offsetWidth > 0) {
+                // If Change Password not visible, find the Chevron or Expand button
+                const allExpandBtns = Array.from(document.querySelectorAll('button, [role="button"], .ms-Icon--ChevronRight, [class*="ChevronRight"], [class*="ChevronDown"]'));
+                const expandBtn = allExpandBtns.find(btn => btn.offsetWidth > 0 && isRelatedTo(btn, passwordLink, '@') && btn.id !== 'ChangePassword' && btn.id !== 'Remove');
+
+                if (expandBtn) {
                     setDebug(`🔓 Click mở rộng mục Mật khẩu...`, '#0284c7');
                     safeClick(expandBtn);
-                    return;
-                } else if (passwordLink.parentElement) {
-                    safeClick(passwordLink.parentElement);
                     return;
                 }
             }
