@@ -610,18 +610,24 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
       const capitalStr = typeof row.newMkCapital === 'string' ? row.newMkCapital.toUpperCase() : '';
       const isCurrentlyCapitalError = checkCapitalResult === 'error' || capitalStr.includes('SAI CAPITAL') || capitalStr.includes('SAI MẬT KHẨU CAPITAL');
       const finalMkCapital = isCurrentlyCapitalError ? row.newMkCapital : newMkCapital;
+      
+      const isMailError = newPassword === 'SAI MẬT KHẨU MAIL';
+      const isCapError = finalMkCapital.toUpperCase().includes('SAI');
+      
+      const finalRecovery = isMailError ? '' : generated;
+      const finalEmail = (isMailError && isCapError) ? '' : row.email;
 
       const body: any = {
         sheetId,
         sheetName,
         rowIndex: row.rowIndex,
-        recovery: generated,
+        recovery: finalRecovery,
         code: otp,
         mode,
       };
 
       if (mode === 'capital') {
-        body.email = row.email;
+        body.email = finalEmail;
         body.newMkHotmail = newPassword;
         body.newMkCapital = finalMkCapital;
       }
