@@ -84,15 +84,15 @@
             const cx = rect.left + rect.width / 2;
             const cy = rect.top + rect.height / 2;
             const opts = { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy };
-            
+
             element.dispatchEvent(new PointerEvent('pointerdown', opts));
             element.dispatchEvent(new MouseEvent('mousedown', opts));
             element.dispatchEvent(new MouseEvent('mouseup', opts));
             element.dispatchEvent(new PointerEvent('pointerup', opts));
-            
+
             const clickEvent = new MouseEvent('click', opts);
             element.dispatchEvent(clickEvent);
-            
+
             if (typeof element.click === 'function') {
                 element.click();
             }
@@ -146,11 +146,11 @@
         if (acc.recovery && emailLower === acc.recovery.toLowerCase().trim()) return false;
 
         const newDomains = [
-            'smvmail.com', 'inboxes.com', 'blondmail.com', 'chapsmail.com', 'clowmail.com', 
-            'dropjar.com', 'fivermail.com', 'getairmail.com', 'getmule.com', 'getnada.com', 
-            'gimpmail.com', 'givmail.com', 'guysmail.com', 'inboxbear.com', 'replyloop.com', 
-            'robot-mail.com', 'tafmail.com', 'temptami.com', 'tupmail.com', 'vomoto.com', 
-            'kapsule.info', 'getinbox.work', 'fviainboxes.com', 'fviadropinbox.com', 
+            'smvmail.com', 'inboxes.com', 'blondmail.com', 'chapsmail.com', 'clowmail.com',
+            'dropjar.com', 'fivermail.com', 'getairmail.com', 'getmule.com', 'getnada.com',
+            'gimpmail.com', 'givmail.com', 'guysmail.com', 'inboxbear.com', 'replyloop.com',
+            'robot-mail.com', 'tafmail.com', 'temptami.com', 'tupmail.com', 'vomoto.com',
+            'kapsule.info', 'getinbox.work', 'fviainboxes.com', 'fviadropinbox.com',
             'fviamail.work', 'dropinboxes.com'
         ];
         const hasNewDomain = newDomains.some(d => emailLower.endsWith('@' + d));
@@ -629,11 +629,11 @@
 
         let actualHasNewRecovery = false;
         const newDomains = [
-            'smvmail.com', 'inboxes.com', 'blondmail.com', 'chapsmail.com', 'clowmail.com', 
-            'dropjar.com', 'fivermail.com', 'getairmail.com', 'getmule.com', 'getnada.com', 
-            'gimpmail.com', 'givmail.com', 'guysmail.com', 'inboxbear.com', 'replyloop.com', 
-            'robot-mail.com', 'tafmail.com', 'temptami.com', 'tupmail.com', 'vomoto.com', 
-            'kapsule.info', 'getinbox.work', 'fviainboxes.com', 'fviadropinbox.com', 
+            'smvmail.com', 'inboxes.com', 'blondmail.com', 'chapsmail.com', 'clowmail.com',
+            'dropjar.com', 'fivermail.com', 'getairmail.com', 'getmule.com', 'getnada.com',
+            'gimpmail.com', 'givmail.com', 'guysmail.com', 'inboxbear.com', 'replyloop.com',
+            'robot-mail.com', 'tafmail.com', 'temptami.com', 'tupmail.com', 'vomoto.com',
+            'kapsule.info', 'getinbox.work', 'fviainboxes.com', 'fviadropinbox.com',
             'fviamail.work', 'dropinboxes.com'
         ];
         for (const el of emailElementsAll) {
@@ -749,7 +749,7 @@
                     const txt = (btn.textContent || btn.value || '').trim().toLowerCase();
                     return btn.id === 'Remove' || txt === 'xóa' || txt === 'remove';
                 });
-                
+
                 const removeBtn = allRemoveBtns.find(btn => btn.offsetWidth > 0 && isRelatedTo(btn, emailEl, 'mật khẩu'));
 
                 const allExpandBtns = Array.from(document.querySelectorAll('button, [role="button"], .ms-Icon--ChevronRight, [class*="ChevronRight"], [class*="ChevronDown"]'));
