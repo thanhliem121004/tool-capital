@@ -271,11 +271,12 @@
             // Cach 2: Tim va click Custom Select Dropdown
             let selectBtn = null;
             if (!isDomainMatched) {
-                selectBtn = document.querySelector('button[id*="domain"]') ||
-                            Array.from(document.querySelectorAll('button, div, span, p, label')).find(el => {
+                const popupContainer = usernameInput.closest('div.fixed, div.absolute, [role="dialog"], [class*="modal"]') || document;
+                selectBtn = popupContainer.querySelector('button[id*="domain"]') ||
+                            Array.from(popupContainer.querySelectorAll('button, div, span, p, label')).find(el => {
                                 const txt = (el.textContent || '').trim().toLowerCase();
                                 const isSuffix = txt.endsWith('.com') || txt.endsWith('.work') || txt.endsWith('.info') || txt.includes('.com') || txt.includes('.work') || txt.includes('.info');
-                                return el.offsetWidth > 0 && isSuffix && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA';
+                                return el.offsetWidth > 0 && isSuffix && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA' && !el.closest('header') && !el.closest('footer') && !el.closest('nav');
                             });
 
                 if (selectBtn) {
@@ -286,7 +287,9 @@
                         // Thu quet xem dropdown option co hien thi tren man hinh khong
                         const optionEl = Array.from(document.querySelectorAll('div, li, span, a, p')).find(el => {
                             const txt = (el.textContent || '').trim().toLowerCase();
-                            return el.offsetWidth > 0 && (txt === domain || txt === '@' + domain || txt === '.' + domain || txt.includes(domain));
+                            return el.offsetWidth > 0 && 
+                                   (txt === domain || txt === '@' + domain || txt === '.' + domain || txt.includes(domain)) && 
+                                   !el.closest('header') && !el.closest('footer') && !el.closest('nav');
                         });
 
                         if (optionEl) {
@@ -356,10 +359,10 @@
                     const docs = json.data?.docs || json.data?.data?.docs || json.docs || [];
                     for (const doc of docs) {
                         const subject = (doc.subject || '').toLowerCase();
-                        const isMatch = subject.includes('microsoft') || subject.includes('ma bao mat') || subject.includes('mã bảo mật') || 
-                                        (doc.text && (doc.text.toLowerCase().includes('microsoft') || doc.text.toLowerCase().includes('mã bảo mật'))) || 
+                        const isMatch = subject.includes('microsoft') || subject.includes('ma bao mat') || subject.includes('mã bảo mật') ||
+                                        (doc.text && (doc.text.toLowerCase().includes('microsoft') || doc.text.toLowerCase().includes('mã bảo mật'))) ||
                                         (doc.html && (doc.html.toLowerCase().includes('microsoft') || doc.html.toLowerCase().includes('mã bảo mật')));
-                        
+
                         if (isMatch) {
                             const otp = extractOtpFromHtml(doc.html, doc.text);
                             if (otp) {
@@ -383,7 +386,7 @@
                         const subj = (msg.s || '').toLowerCase();
                         return sender.includes('microsoft') || subj.includes('microsoft') || subj.includes('ma bao mat') || subj.includes('mã bảo mật') || subj.includes('security code');
                     });
-                    
+
                     if (targetMsg) {
                         const bodyUrl = `https://inboxes.com/api/v2/message/${encodeURIComponent(targetMsg.uid)}`;
                         makeRequest(bodyUrl, "GET", null, function(err, bodyResponseText) {
@@ -441,14 +444,14 @@
                                 if (el.offsetWidth === 0) continue;
                                 if (el.tagName === 'BODY' || el.tagName === 'HTML' || el.tagName === 'MAIN') continue;
                                 if (el.closest('header') || el.closest('footer') || el.closest('nav') || el.closest('.sidebar')) continue;
-                                
+
                                 const txt = (el.innerText || el.textContent || '').toLowerCase();
                                 if (txt.includes('microsoft') || txt.includes('ma bao mat') || txt.includes('security code') || txt.includes('mã bảo mật')) {
                                     // Kiểm tra xem phần tử này có phải là thẻ click được không
-                                    if (el.tagName === 'A' || el.tagName === 'TR' || el.tagName === 'LI' || el.tagName === 'TD' || 
-                                        el.classList.contains('cursor-pointer') || 
-                                        getComputedStyle(el).cursor === 'pointer' || 
-                                        el.getAttribute('role') === 'row' || 
+                                    if (el.tagName === 'A' || el.tagName === 'TR' || el.tagName === 'LI' || el.tagName === 'TD' ||
+                                        el.classList.contains('cursor-pointer') ||
+                                        getComputedStyle(el).cursor === 'pointer' ||
+                                        el.getAttribute('role') === 'row' ||
                                         el.getAttribute('role') === 'button' ||
                                         el.getAttribute('role') === 'cell') {
                                         targetRow = el;
@@ -456,17 +459,17 @@
                                     }
                                 }
                             }
-                            
+
                             if (targetRow) {
                                 const debugClass = targetRow.className ? `.${targetRow.className.replace(/ /g, '.')}` : '';
                                 setDebug(`🎯 Click mo thu Microsoft: <${targetRow.tagName.toLowerCase()}${debugClass}>...`, '#0284c7');
-                                
+
                                 // Dùng hàm safeClick đã được tối ưu thay vì click thủ công
                                 safeClick(targetRow);
                                 // Click thêm thẻ a bên trong nếu có (đề phòng)
                                 const link = targetRow.querySelector('a');
                                 if (link) safeClick(link);
-                                
+
                                 return;
                             }
                         }
