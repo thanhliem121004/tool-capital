@@ -164,7 +164,12 @@ export function MercuryCard({ row, onUpdated, mailProvider, preferredDomain = 'r
     const activeMail = email || row.email || '';
     if (activeMail) {
       const domain = activeMail.split('@')[1]?.toLowerCase() || '';
-      const inboxesDomains = ['inboxes.com', 'dropjar.com', 'kapsule.info', 'getinbox.work', 'fivermail.com'];
+      const inboxesDomains = [
+        'inboxes.com', 'blondmail.com', 'chapsmail.com', 'clowmail.com', 'dropjar.com', 
+        'fivermail.com', 'getairmail.com', 'getmule.com', 'getnada.com', 'gimpmail.com', 
+        'givmail.com', 'guysmail.com', 'inboxbear.com', 'replyloop.com', 'robot-mail.com', 
+        'tafmail.com', 'temptami.com', 'tupmail.com', 'vomoto.com', 'kapsule.info', 'getinbox.work'
+      ];
       const isSmv = domain === 'smvmail.com';
       const isInboxes = inboxesDomains.some(d => domain.includes(d));
       if (isSmv) {
@@ -230,7 +235,12 @@ export function MercuryCard({ row, onUpdated, mailProvider, preferredDomain = 'r
     const activeMail = email || row.email || '';
     if (activeMail) {
       const domain = activeMail.split('@')[1]?.toLowerCase() || '';
-      const inboxesDomains = ['inboxes.com', 'dropjar.com', 'kapsule.info', 'getinbox.work', 'fivermail.com'];
+      const inboxesDomains = [
+        'inboxes.com', 'blondmail.com', 'chapsmail.com', 'clowmail.com', 'dropjar.com', 
+        'fivermail.com', 'getairmail.com', 'getmule.com', 'getnada.com', 'gimpmail.com', 
+        'givmail.com', 'guysmail.com', 'inboxbear.com', 'replyloop.com', 'robot-mail.com', 
+        'tafmail.com', 'temptami.com', 'tupmail.com', 'vomoto.com', 'kapsule.info', 'getinbox.work'
+      ];
       const isSmv = domain === 'smvmail.com';
       const isInboxes = inboxesDomains.some(d => domain.includes(d));
       if (isSmv) {

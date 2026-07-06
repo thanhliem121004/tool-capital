@@ -145,7 +145,14 @@
         if (acc.email && emailLower === acc.email.toLowerCase().trim()) return false;
         if (acc.recovery && emailLower === acc.recovery.toLowerCase().trim()) return false;
 
-        const newDomains = ['smvmail.com', 'fivermail.com', 'fviainboxes.com', 'fviadropinbox.com', 'fviamail.work', 'dropinboxes.com'];
+        const newDomains = [
+            'smvmail.com', 'inboxes.com', 'blondmail.com', 'chapsmail.com', 'clowmail.com', 
+            'dropjar.com', 'fivermail.com', 'getairmail.com', 'getmule.com', 'getnada.com', 
+            'gimpmail.com', 'givmail.com', 'guysmail.com', 'inboxbear.com', 'replyloop.com', 
+            'robot-mail.com', 'tafmail.com', 'temptami.com', 'tupmail.com', 'vomoto.com', 
+            'kapsule.info', 'getinbox.work', 'fviainboxes.com', 'fviadropinbox.com', 
+            'fviamail.work', 'dropinboxes.com'
+        ];
         const hasNewDomain = newDomains.some(d => emailLower.endsWith('@' + d));
 
         if (emailLower.includes('@') && !hasNewDomain) {
@@ -621,7 +628,14 @@
         });
 
         let actualHasNewRecovery = false;
-        const newDomains = ['smvmail.com', 'fivermail.com', 'fviainboxes.com', 'fviadropinbox.com', 'fviamail.work', 'dropinboxes.com'];
+        const newDomains = [
+            'smvmail.com', 'inboxes.com', 'blondmail.com', 'chapsmail.com', 'clowmail.com', 
+            'dropjar.com', 'fivermail.com', 'getairmail.com', 'getmule.com', 'getnada.com', 
+            'gimpmail.com', 'givmail.com', 'guysmail.com', 'inboxbear.com', 'replyloop.com', 
+            'robot-mail.com', 'tafmail.com', 'temptami.com', 'tupmail.com', 'vomoto.com', 
+            'kapsule.info', 'getinbox.work', 'fviainboxes.com', 'fviadropinbox.com', 
+            'fviamail.work', 'dropinboxes.com'
+        ];
         for (const el of emailElementsAll) {
             const txt = el.textContent.toLowerCase().trim();
             if (newDomains.some(d => txt.endsWith('@' + d))) {

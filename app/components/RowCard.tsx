@@ -314,7 +314,13 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
     const domain = parts[1] || '';
     
     const fviaDomains = ['fviainboxes.com', 'fviadropinbox.com', 'fviamail.work', 'dropinboxes.com'];
-    const inboxesDomains = ['inboxes.com', 'dropjar.com', 'kapsule.info', 'getinbox.work', 'fivermail.com', 'smvmail.com'];
+    const inboxesDomains = [
+      'inboxes.com', 'blondmail.com', 'chapsmail.com', 'clowmail.com', 'dropjar.com', 
+      'fivermail.com', 'getairmail.com', 'getmule.com', 'getnada.com', 'gimpmail.com', 
+      'givmail.com', 'guysmail.com', 'inboxbear.com', 'replyloop.com', 'robot-mail.com', 
+      'tafmail.com', 'temptami.com', 'tupmail.com', 'vomoto.com', 'kapsule.info', 'getinbox.work',
+      'smvmail.com'
+    ];
     
     const isFvia = fviaDomains.includes(domain);
     const isInboxes = inboxesDomains.includes(domain);
@@ -749,7 +755,13 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
               if (row.oldRecovery) {
                 const domain = row.oldRecovery.split('@')[1]?.toLowerCase() || '';
                 const fviaDomains = ['fviainboxes.com', 'fviadropinbox.com', 'fviamail.work', 'dropinboxes.com'];
-                const inboxesDomains = ['inboxes.com', 'dropjar.com', 'kapsule.info', 'getinbox.work', 'fivermail.com', 'smvmail.com'];
+                const inboxesDomains = [
+                  'inboxes.com', 'blondmail.com', 'chapsmail.com', 'clowmail.com', 'dropjar.com', 
+                  'fivermail.com', 'getairmail.com', 'getmule.com', 'getnada.com', 'gimpmail.com', 
+                  'givmail.com', 'guysmail.com', 'inboxbear.com', 'replyloop.com', 'robot-mail.com', 
+                  'tafmail.com', 'temptami.com', 'tupmail.com', 'vomoto.com', 'kapsule.info', 'getinbox.work',
+                  'smvmail.com'
+                ];
                 const isFvia = fviaDomains.some(d => domain.includes(d));
                 const isInboxes = inboxesDomains.some(d => domain.includes(d));
                 if (!isFvia && !isInboxes) {
@@ -768,7 +780,12 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
               let recoveryMailboxUrl = '';
               if (generated) {
                 const domain = generated.split('@')[1]?.toLowerCase() || '';
-                const inboxesDomains = ['inboxes.com', 'dropjar.com', 'kapsule.info', 'getinbox.work', 'fivermail.com'];
+                const inboxesDomains = [
+                  'inboxes.com', 'blondmail.com', 'chapsmail.com', 'clowmail.com', 'dropjar.com', 
+                  'fivermail.com', 'getairmail.com', 'getmule.com', 'getnada.com', 'gimpmail.com', 
+                  'givmail.com', 'guysmail.com', 'inboxbear.com', 'replyloop.com', 'robot-mail.com', 
+                  'tafmail.com', 'temptami.com', 'tupmail.com', 'vomoto.com', 'kapsule.info', 'getinbox.work'
+                ];
                 const isSmv = domain === 'smvmail.com';
                 const isInboxes = inboxesDomains.some(d => domain.includes(d));
                 if (isSmv) {
