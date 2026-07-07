@@ -250,12 +250,12 @@
 
         if (isAutoCheck && isWrongCredsText) {
             window._wrongCredsCount = (window._wrongCredsCount || 0) + 1;
-            if (window._wrongCredsCount >= 3) {
+            if (window._wrongCredsCount >= 10) {
                 clearInterval(interval);
                 reportResult(acc, 'error', 'Sai tai khoan hoac mat khau Capital One');
                 return;
             } else {
-                setDebug(`Phat hien thong bao loi mat khau (lan ${window._wrongCredsCount}/3), dang cho them de xac nhan...`, '#eab308');
+                setDebug(`Phat hien thong bao loi mat khau (lan ${window._wrongCredsCount}/10), dang cho them de xac nhan...`, '#eab308');
             }
         } else {
             window._wrongCredsCount = 0;
