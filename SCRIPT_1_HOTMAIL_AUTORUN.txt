@@ -401,7 +401,8 @@
         const isKmsiPage = pageTextLower.includes('duy trì đăng nhập') || 
                            pageTextLower.includes('stay signed in') || 
                            pageTextLower.includes('bỏ qua việc mỗi lần đều phải đăng nhập') ||
-                           document.getElementById('KmsiCheckboxField');
+                           document.getElementById('KmsiCheckboxField') ||
+                           document.getElementById('KmsiDescription');
 
         if (isKmsiPage) {
             const declineBtn = document.getElementById('idBtn_Back') || document.getElementById('declineButton');

