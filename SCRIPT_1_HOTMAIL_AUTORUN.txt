@@ -396,8 +396,21 @@
             return;
         }
 
-        // Removed Identity Verification and KMSI as requested by user
+        // KMSI (Stay signed in) prompt
+        const pageTextLower = (document.body.innerText || '').toLowerCase();
+        const isKmsiPage = pageTextLower.includes('duy trì đăng nhập') || 
+                           pageTextLower.includes('stay signed in') || 
+                           pageTextLower.includes('bỏ qua việc mỗi lần đều phải đăng nhập') ||
+                           document.getElementById('KmsiCheckboxField');
 
+        if (isKmsiPage) {
+            const declineBtn = document.getElementById('idBtn_Back') || document.getElementById('declineButton');
+            if (declineBtn && declineBtn.offsetWidth > 0) {
+                setDebug(`🖱️ Từ chối Duy trì đăng nhập (Click Không)...`, '#eab308');
+                safeClick(declineBtn);
+                return;
+            }
+        }
         const sendCodeBtn = Array.from(document.querySelectorAll('input[type="submit"], input[type="button"], button')).find(el => {
             const txt = (el.textContent || el.value || '').trim().toLowerCase();
             return txt === 'gửi mã' || txt === 'send code' || txt.includes('gửi mã') || txt.includes('send code');
