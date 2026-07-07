@@ -442,12 +442,13 @@
 
             if (loginBtn && emailInput && emailInput.value.length > 0 && (passInput ? passInput.value.length > 0 : true)) {
                 window._signInClickCount = window._signInClickCount || 0;
-                if (window._signInClickCount < 3) {
+                if (window._signInClickCount === 0) {
                     window._signInClickCount++;
-                    setDebug(`Click [Sign In/Continue] (${window._signInClickCount}/3)...`, '#16a34a');
+                    setDebug('Click [Sign In/Continue]...', '#16a34a');
                     safeClick(loginBtn);
                 } else {
-                    setDebug('Da click Sign In 3 lan, dang cho he thong xu ly...', '#eab308');
+                    window._signInClickCount++;
+                    setDebug(`Da click Sign In, dang cho he thong load (${window._signInClickCount})...`, '#eab308');
                 }
                 return;
             }
