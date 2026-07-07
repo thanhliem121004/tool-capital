@@ -369,15 +369,20 @@
                 return;
             }
 
-            const changeBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+            const changeBtn = Array.from(document.querySelectorAll('button, a, span')).find(btn => {
+                if (btn.offsetWidth === 0 || btn.offsetHeight === 0) return false;
                 const txt = (btn.textContent || '').trim().toLowerCase();
-                return txt === 'change' || (btn.classList.contains('secondary-btn-large') && txt.includes('change')) || (btn.className && typeof btn.className === 'string' && btn.className.includes('secondary-btn') && txt.includes('change'));
+                if (txt === 'change' || txt === 'change password') return true;
+                if (btn.className && typeof btn.className === 'string' && btn.className.includes('secondary-btn') && txt.includes('change')) return true;
+                return false;
             });
 
             if (changeBtn && changeBtn.offsetWidth > 0) {
                 setDebug('🖱️ Click [Change] mat khau...', '#0284c7');
                 safeClick(changeBtn);
                 return;
+            } else {
+                setDebug('Dang o Profile, cho nut Change hoac form xuat hien...', '#eab308');
             }
             return;
         }
