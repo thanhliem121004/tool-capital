@@ -241,12 +241,16 @@
 
         // Kiem tra loi dang nhap truoc
         const bodyText = (document.body.innerText || '').toLowerCase();
-        const isWrongCredsText = bodyText.includes('incorrect email or password') ||
+        const passInputVisible = Array.from(document.querySelectorAll('input[type="password"], input[id*="password"], input[name*="password"]'))
+                                      .some(el => el.offsetWidth > 0 && el.offsetHeight > 0);
+                                      
+        const isWrongCredsText = passInputVisible && (
+                                 bodyText.includes('incorrect email or password') ||
                                  bodyText.includes("don't recognize that email or password") ||
                                  bodyText.includes("incorrect password") ||
                                  (bodyText.includes("don't recognize") && (bodyText.includes("email") || bodyText.includes("password"))) ||
                                  bodyText.includes("wrong email or password") ||
-                                 (bodyText.includes("invalid") && bodyText.includes("password"));
+                                 (bodyText.includes("invalid") && bodyText.includes("password")));
 
         if (isAutoCheck && isWrongCredsText) {
             window._wrongCredsCount = (window._wrongCredsCount || 0) + 1;
