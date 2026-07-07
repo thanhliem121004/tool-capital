@@ -5,13 +5,18 @@ import { NextRequest, NextResponse } from 'next/server';
 // Bằng cách lưu ở global, dữ liệu sẽ chia sẻ được giữa các request trong quá trình dev
 const globalForOtp = global as unknown as {
   otpCache?: Map<string, { otp: string; timestamp: number }>;
+  lastScrapeTime?: Map<string, number>;
 };
 
 if (!globalForOtp.otpCache) {
   globalForOtp.otpCache = new Map();
 }
+if (!globalForOtp.lastScrapeTime) {
+  globalForOtp.lastScrapeTime = new Map();
+}
 
 const otpCache = globalForOtp.otpCache;
+const lastScrapeTime = globalForOtp.lastScrapeTime;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -56,7 +61,6 @@ export async function GET(request: NextRequest) {
       otpCache.set(key, { otp: String(otp).trim(), timestamp: Date.now() });
       console.log(`[otp-bridge-GET] Ghi nhận OTP mới qua GET/Beacon cho ${key}: ${otp}`);
       
-      // Trả về ảnh 1x1 GIF trong suốt
       const buf = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
       return new NextResponse(buf, {
         headers: {
@@ -69,17 +73,56 @@ export async function GET(request: NextRequest) {
 
     // NẾU CHỈ CÓ EMAIL: Truy vấn OTP
     const entry = otpCache.get(key);
-    if (!entry) {
-      return NextResponse.json({ success: true, otp: null }, { headers: corsHeaders });
+    
+    if (entry && Date.now() - entry.timestamp <= 10 * 60 * 1000) {
+      return NextResponse.json({ success: true, otp: entry.otp }, { headers: corsHeaders });
+    }
+    
+    if (entry) otpCache.delete(key);
+
+    // NẾU CHƯA CÓ OTP, KIỂM TRA XEM CÓ PHẢI EMAIL TRANGCODE KHÔNG VÀ TỰ ĐỘNG FETCH
+    const domain = key.split('@')[1] || '';
+    const fviaDomains = ['fviainboxes.com', 'fviadropinbox.com', 'fviamail.work', 'dropinboxes.com'];
+    const inboxesDomains = [
+      'inboxes.com', 'blondmail.com', 'chapsmail.com', 'clowmail.com', 'dropjar.com', 
+      'fivermail.com', 'getairmail.com', 'getmule.com', 'getnada.com', 'gimpmail.com', 
+      'givmail.com', 'guysmail.com', 'inboxbear.com', 'replyloop.com', 'robot-mail.com', 
+      'tafmail.com', 'temptami.com', 'tupmail.com', 'vomoto.com', 'kapsule.info', 'getinbox.work',
+      'smvmail.com'
+    ];
+    
+    const isFvia = fviaDomains.some(d => domain.includes(d));
+    const isInboxes = inboxesDomains.some(d => domain.includes(d));
+    
+    if (!isFvia && !isInboxes && domain.length > 0) {
+      // Throttle: Chỉ fetch tối đa 1 lần mỗi 4 giây
+      const lastFetch = lastScrapeTime.get(key) || 0;
+      if (Date.now() - lastFetch > 4000) {
+        lastScrapeTime.set(key, Date.now());
+        try {
+          const fetchRes = await fetch(`http://127.0.0.1:3000/api/scrape-trangcode?email=${encodeURIComponent(key)}`);
+          const fetchData = await fetchRes.json();
+          if (fetchData.success && fetchData.html) {
+            // Parse HTML tìm OTP 6 số
+            const plainText = fetchData.html.replace(/<[^>]+>/g, ' '); // Xóa HTML tags
+            const matches = plainText.match(/\b\d{6}\b/g);
+            if (matches) {
+              const cleanMatches = matches.filter((m: string) => m !== '707070');
+              if (cleanMatches.length > 0) {
+                const latestOtp = cleanMatches[cleanMatches.length - 1];
+                otpCache.set(key, { otp: latestOtp, timestamp: Date.now() });
+                console.log(`[otp-bridge-auto] Tự động fetch OTP thành công cho Trangcode ${key}: ${latestOtp}`);
+                return NextResponse.json({ success: true, otp: latestOtp }, { headers: corsHeaders });
+              }
+            }
+          }
+        } catch (e) {
+          console.error('[otp-bridge-auto] Lỗi fetch Trangcode:', e);
+        }
+      }
     }
 
-    // OTP hết hạn sau 10 phút
-    if (Date.now() - entry.timestamp > 10 * 60 * 1000) {
-      otpCache.delete(key);
-      return NextResponse.json({ success: true, otp: null }, { headers: corsHeaders });
-    }
-
-    return NextResponse.json({ success: true, otp: entry.otp }, { headers: corsHeaders });
+    return NextResponse.json({ success: true, otp: null }, { headers: corsHeaders });
   } catch (err) {
     return NextResponse.json({ success: false, error: String(err) }, { status: 500, headers: corsHeaders });
   }
