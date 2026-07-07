@@ -249,9 +249,16 @@
                                  (bodyText.includes("invalid") && bodyText.includes("password"));
 
         if (isAutoCheck && isWrongCredsText) {
-            clearInterval(interval);
-            reportResult(acc, 'error', 'Sai tai khoan hoac mat khau Capital One');
-            return;
+            window._wrongCredsCount = (window._wrongCredsCount || 0) + 1;
+            if (window._wrongCredsCount >= 3) {
+                clearInterval(interval);
+                reportResult(acc, 'error', 'Sai tai khoan hoac mat khau Capital One');
+                return;
+            } else {
+                setDebug(`Phat hien thong bao loi mat khau (lan ${window._wrongCredsCount}/3), dang cho them de xac nhan...`, '#eab308');
+            }
+        } else {
+            window._wrongCredsCount = 0;
         }
 
         // 1. NEU DANG O TRANG PROFILE (ACCOUNT SETTINGS)
