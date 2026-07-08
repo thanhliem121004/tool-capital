@@ -1,0 +1,498 @@
+// ==UserScript==
+// @name         Capital One Shopping Auto Login & Change Password (API Sync)
+// @namespace    http://tampermonkey.net/
+// @version      1.1
+// @description  Tu dong dang nhap bang email + MK Capital cu, tu dong doi MK, hoac tu dong check dang nhap
+// @author       Antigravity AI
+// @match        https://*.capitaloneshopping.com/*
+// @match        https://capitaloneshopping.com/*
+// @grant        GM_xmlhttpRequest
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        window.close
+// @connect      127.0.0.1
+// @connect      localhost
+// @run-at       document-end
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    let debugDiv = null;
+    let isClickingDiffWay = false;
+    let isReported = false;
+
+    function initDebug() {
+        if (debugDiv) return;
+        debugDiv = document.createElement('div');
+        debugDiv.style.position = 'fixed';
+        debugDiv.style.top = '10px';
+        debugDiv.style.right = '10px';
+        debugDiv.style.background = '#0f172a';
+        debugDiv.style.color = 'white';
+        debugDiv.style.padding = '12px 16px';
+        debugDiv.style.borderRadius = '8px';
+        debugDiv.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';
+        debugDiv.style.zIndex = '9999999';
+        debugDiv.style.fontSize = '13px';
+        debugDiv.style.fontFamily = 'monospace';
+        debugDiv.style.lineHeight = '1.5';
+        debugDiv.style.maxWidth = '400px';
+        debugDiv.style.wordBreak = 'break-all';
+        debugDiv.innerHTML = '[Capital One Shopping] Dang khoi dong...';
+        document.body.appendChild(debugDiv);
+    }
+
+    function setDebug(msg, color = '#0f172a') {
+        if (!debugDiv) initDebug();
+        debugDiv.style.background = color;
+        debugDiv.innerHTML = '[Capital One Shopping]<br>' + msg;
+    }
+
+    const API_CURRENT_ACCOUNT = 'http://127.0.0.1:3000/api/current-account';
+    const API_REPORT_RESULT = 'http://127.0.0.1:3000/api/check-capital/report';
+
+    function safeFill(element, value) {
+        if (!element) return false;
+        try {
+            element.focus();
+            const prototype = Object.getPrototypeOf(element);
+            const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+
+            if (descriptor && descriptor.set) {
+                descriptor.set.call(element, value);
+            } else {
+                element.value = value;
+            }
+
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+            element.dispatchEvent(new Event('blur', { bubbles: true }));
+            element.dispatchEvent(new Event('focus', { bubbles: true }));
+            element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: value }));
+            element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: value }));
+        } catch (e) {
+            console.error('[Tampermonkey] Loi safeFill:', e);
+            element.value = value;
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        return true;
+    }
+
+    function safeClick(element) {
+        if (!element) return false;
+        try {
+            element.focus();
+            const clickEvent = new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true
+            });
+            element.dispatchEvent(clickEvent);
+            if (typeof element.click === 'function') {
+                element.click();
+            }
+        } catch (e) {
+            console.error('[Tampermonkey] Lỗi safeClick:', e);
+            try { element.click(); } catch(err) {}
+        }
+        return true;
+    }
+
+    function makeRequest(url, method, data, callback) {
+        if (typeof GM_xmlhttpRequest !== 'undefined') {
+            GM_xmlhttpRequest({
+                method: method,
+                url: url,
+                headers: { "Content-Type": "application/json" },
+                data: data ? JSON.stringify(data) : null,
+                onload: function(res) { callback(null, res.responseText); },
+                onerror: function(err) {
+                    fetch(url, {
+                        method: method,
+                        headers: data ? { "Content-Type": "application/json" } : {},
+                        body: data ? JSON.stringify(data) : null
+                    })
+                    .then(r => r.text())
+                    .then(text => callback(null, text))
+                    .catch(e => callback(e, null));
+                }
+            });
+        } else {
+            fetch(url, {
+                method: method,
+                headers: data ? { "Content-Type": "application/json" } : {},
+                body: data ? JSON.stringify(data) : null
+            })
+            .then(r => r.text())
+            .then(text => callback(null, text))
+            .catch(e => callback(e, null));
+        }
+    }
+
+    function reportResult(acc, status, errorMsg = '') {
+        if (isReported) return;
+        isReported = true;
+
+        const body = {
+            sheetId: acc.sheetId,
+            sheetName: acc.sheetName,
+            rowIndex: acc.rowIndex,
+            email: acc.email,
+            status: status,
+            error: errorMsg
+        };
+
+        setDebug(`Gui ket qua check: [${status.toUpperCase()}]...`, status === 'ok' ? '#16a34a' : '#be123c');
+
+        makeRequest(API_REPORT_RESULT, "POST", body, function(err) {
+            if (err) {
+                console.error('[Script 3] Loi gui bao cao:', err);
+            }
+            // Tu dong dong tab sau khi gui bao cao thanh cong (lừa opener de close tab)
+            setTimeout(() => {
+                window.open('', '_self', '');
+                window.close();
+            }, 1000);
+        });
+    }
+
+    function checkURLHash() {
+        const hash = window.location.hash;
+        if (hash.startsWith('#check=')) {
+            try {
+                const base64Data = hash.substring(7);
+                const decodedData = decodeURIComponent(escape(atob(base64Data)));
+                return JSON.parse(decodedData);
+            } catch (e) {
+                console.error('[Script 3] Loi parse hash check:', e);
+            }
+        }
+        return null;
+    }
+
+    function initialize() {
+        initDebug();
+
+        // 1. Kiem tra xem co phai dang o luong tu dong check khong
+        const checkAcc = checkURLHash();
+        const isCurrentlyAuto = !!checkAcc || sessionStorage.getItem('is_auto_check') === 'true';
+
+        if (isCurrentlyAuto) {
+            if (checkAcc) {
+                sessionStorage.setItem('is_auto_check', 'true');
+                sessionStorage.setItem('auto_check_acc', JSON.stringify(checkAcc));
+            }
+            const activeAcc = checkAcc || JSON.parse(sessionStorage.getItem('auto_check_acc'));
+
+            setDebug(`Luong CHECK tu dong!<br>Acc: ${activeAcc.email}`, '#6366f1');
+
+            // Đặt tiêu đề đặc biệt để tool ở backend nhận diện và đóng cửa sổ này
+            document.title = "CAPITAL_AUTO_CHECK_WINDOW";
+            setInterval(() => {
+                document.title = "CAPITAL_AUTO_CHECK_WINDOW";
+            }, 200);
+
+            // Loop de tu dong check
+            const checkInterval = setInterval(() => {
+                runStep(activeAcc, checkInterval, true);
+            }, 1500);
+            return;
+        }
+
+        // 2. Neu khong phai luong check thi chay luong doi mat khau dong bo binh thuong
+        setTimeout(() => {
+            const interval = setInterval(() => {
+                try {
+                    makeRequest(API_CURRENT_ACCOUNT, "GET", null, function(err, responseText) {
+                        if (err) {
+                            setDebug('Khong ket noi duoc voi Tool local de dong bo...', '#be123c');
+                            return;
+                        }
+                        try {
+                            const resData = JSON.parse(responseText);
+                            if (resData.success && resData.account) {
+                                const acc = resData.account;
+                                setDebug(`Dong bo OK!<br>Acc dang xu ly: ${acc.email}`, '#16a34a');
+                                runStep(acc, interval, false);
+                            } else {
+                                setDebug('Vui long click [Vao Capital] tren giao dien Tool de truyen thong tin...');
+                            }
+                        } catch (e) {
+                            console.error('Loi parse config:', e);
+                        }
+                    });
+                } catch (e) {
+                    setDebug('Loi vong lap: ' + e.message, '#be123c');
+                }
+            }, 1000);
+        }, 1000);
+    }
+
+    if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', initialize);
+    } else {
+        initialize();
+    }
+
+    function runStep(acc, interval, isAutoCheck = false) {
+        const path = window.location.pathname;
+        const host = window.location.host;
+
+        // Kiem tra loi dang nhap truoc
+        const bodyText = (document.body.innerText || '').toLowerCase();
+        const passInputVisible = Array.from(document.querySelectorAll('input[type="password"], input[id*="password"], input[name*="password"]'))
+                                      .some(el => el.offsetWidth > 0 && el.offsetHeight > 0);
+                                      
+        const isWrongCredsText = passInputVisible && (
+                                 bodyText.includes('incorrect email or password') ||
+                                 bodyText.includes("don't recognize that email or password") ||
+                                 bodyText.includes("incorrect password") ||
+                                 (bodyText.includes("don't recognize") && (bodyText.includes("email") || bodyText.includes("password"))) ||
+                                 bodyText.includes("wrong email or password") ||
+                                 (bodyText.includes("invalid") && bodyText.includes("password")));
+
+        if (isAutoCheck && isWrongCredsText) {
+            window._wrongCredsCount = (window._wrongCredsCount || 0) + 1;
+            if (window._wrongCredsCount >= 10) {
+                clearInterval(interval);
+                reportResult(acc, 'error', 'Sai tai khoan hoac mat khau Capital One');
+                return;
+            } else {
+                setDebug(`Phat hien thong bao loi mat khau (lan ${window._wrongCredsCount}/10), dang cho them de xac nhan...`, '#eab308');
+            }
+        } else {
+            window._wrongCredsCount = 0;
+        }
+
+        // 1. NEU DANG O TRANG PROFILE (ACCOUNT SETTINGS)
+        if (path.includes('/account-settings/profile') || path.includes('/profile')) {
+            if (isAutoCheck) {
+                clearInterval(interval);
+                reportResult(acc, 'ok');
+                return;
+            }
+
+            // Luong doi mat khau
+            const currentPassInput = document.getElementById('id_currentPassword') || document.querySelector('input[name="currentPassword"]');
+            const newPassInput = document.getElementById('id_newPassword') || document.querySelector('input[name="newPassword"]');
+
+            if (currentPassInput && currentPassInput.offsetWidth > 0 && newPassInput && newPassInput.offsetWidth > 0) {
+                // Điền mật khẩu
+                safeFill(currentPassInput, acc.mkCapital);
+                safeFill(newPassInput, acc.newMkCapital);
+
+                // Tìm nút "Change Password" bằng interval để chắc chắn bắt được khi React render xong
+                if (!window._saveBtnInterval) {
+                    window._saveBtnInterval = setInterval(() => {
+                        // Bỏ qua nếu form đã đóng (input biến mất)
+                        const currentInput = document.getElementById('id_currentPassword') || document.querySelector('input[name="currentPassword"]');
+                        if (!currentInput || currentInput.offsetWidth === 0) {
+                            clearInterval(window._saveBtnInterval);
+                            window._saveBtnInterval = null;
+                            return;
+                        }
+
+                        // Cách 1: Tìm bằng class đặc trưng
+                        let saveBtn = document.querySelector('button.primary-btn-large, .primary-btn-large');
+
+                        // Cách 2: Tìm tất cả các thẻ và lọc theo text
+                        if (!saveBtn || saveBtn.offsetWidth === 0) {
+                            const elements = Array.from(document.querySelectorAll('*'));
+                            saveBtn = elements.find(el => {
+                                if (el.offsetWidth === 0) return false;
+                                // Bỏ qua body, html, form, div bọc ngoài quá lớn
+                                if (['BODY', 'HTML', 'FORM'].includes(el.tagName)) return false;
+                                if (el.children.length > 2) return false; // Thẻ chứa chữ thường không có quá nhiều thẻ con
+
+                                const txt = (el.textContent || el.value || '').trim().toLowerCase();
+                                return txt === 'change password';
+                            });
+                        }
+
+                        if (saveBtn) {
+                            setDebug('💾 Click [Change Password]...', '#16a34a');
+                            const target = saveBtn.closest('button') || saveBtn;
+                            const rect = target.getBoundingClientRect();
+                            if (rect.width > 0 && rect.height > 0) {
+                                const cx = rect.left + rect.width / 2;
+                                const cy = rect.top + rect.height / 2;
+                                const opts = { bubbles: true, cancelable: true, clientX: cx, clientY: cy };
+                                target.focus();
+                                target.dispatchEvent(new PointerEvent('pointerdown', opts));
+                                target.dispatchEvent(new MouseEvent('mousedown', opts));
+                                target.dispatchEvent(new PointerEvent('pointerup', opts));
+                                target.dispatchEvent(new MouseEvent('mouseup', opts));
+                                target.dispatchEvent(new MouseEvent('click', opts));
+                                target.click();
+                            } else {
+                                target.click();
+                            }
+
+                            clearInterval(window._saveBtnInterval);
+                            window._saveBtnInterval = null;
+                        }
+                    }, 500);
+                }
+
+                // Tránh trùng lặp interval kiểm tra đổi mật khẩu thành công
+                if (!window.checkSuccessActive) {
+                    window.checkSuccessActive = true;
+                    let checkCount = 0;
+                    const checkSuccessInterval = setInterval(() => {
+                        checkCount++;
+
+                        // 1. Kiểm tra xem có thông báo lỗi nào xuất hiện không
+                        const bodyText = document.body.innerText.toLowerCase();
+                        const hasError = bodyText.includes('must contain') ||
+                                         bodyText.includes('incorrect current password');
+
+                        if (hasError && checkCount < 6) {
+                            clearInterval(checkSuccessInterval);
+                            window.checkSuccessActive = false;
+                            setDebug('❌ Sai mật khẩu hiện tại hoặc mật khẩu mới không đúng yêu cầu!', '#be123c');
+                            return;
+                        }
+
+                        // 2. Kiểm tra xem các ô nhập mật khẩu đã thực sự biến mất khỏi màn hình (form đóng lại)
+                        const currentInput = document.getElementById('id_currentPassword') || document.querySelector('input[name="currentPassword"]');
+                        const isInputsGone = !currentInput || currentInput.offsetWidth === 0;
+
+                        if (isInputsGone || checkCount >= 12) { // Chờ tối đa 18 giây (12 * 1500ms)
+                            clearInterval(checkSuccessInterval);
+                            window.checkSuccessActive = false;
+                            setDebug('🎉 Đổi mật khẩu Capital thành công!', '#16a34a');
+                            reportResult(acc, 'ok');
+                        }
+                    }, 1500);
+                }
+                return;
+            }
+
+            const changeBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                const txt = (btn.textContent || '').trim().toLowerCase();
+                return txt === 'change' || (btn.classList.contains('secondary-btn-large') && txt.includes('change')) || (btn.className && typeof btn.className === 'string' && btn.className.includes('secondary-btn') && txt.includes('change'));
+            });
+
+            if (changeBtn && changeBtn.offsetWidth > 0) {
+                setDebug('🖱️ Click [Change] mat khau...', '#0284c7');
+                safeClick(changeBtn);
+                return;
+            }
+            return;
+        }
+
+        // 2. NEU DANG O TRANG DANG NHAP (SIGN IN)
+        const isLoginPage = path.includes('/auth/signin') ||
+                            path.includes('/sign-in') ||
+                            path.includes('/login') ||
+                            document.getElementById('id_email') !== null ||
+                            document.querySelector('input[type="email"]') !== null ||
+                            Array.from(document.querySelectorAll('button, a, span')).some(el => (el.textContent || '').toLowerCase().includes('sign in a different way'));
+
+        if (isLoginPage) {
+            const emailInput = Array.from(document.querySelectorAll('input[type="email"], input[id*="email"], input[name*="email"]'))
+                                    .find(el => el.offsetWidth > 0 && el.offsetHeight > 0) ||
+                               document.querySelector('input[type="email"]');
+
+            const passInput = Array.from(document.querySelectorAll('input[type="password"], input[id*="password"], input[name*="password"]'))
+                                   .find(el => el.offsetWidth > 0 && el.offsetHeight > 0) ||
+                              document.querySelector('input[type="password"]');
+
+            if (!passInput || passInput.offsetWidth === 0) {
+                if (isClickingDiffWay) return;
+
+                const diffWayBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                    const txt = (btn.textContent || '').trim().toLowerCase();
+                    return btn.classList.contains('sign-in-secondary-link') || txt.includes('sign in a different way');
+                });
+
+                if (diffWayBtn && diffWayBtn.offsetWidth > 0) {
+                    setDebug('Click [Sign in a different way]...', '#0284c7');
+                    isClickingDiffWay = true;
+                    safeClick(diffWayBtn);
+                    setTimeout(() => { isClickingDiffWay = false; }, 4000);
+                    return;
+                }
+            }
+
+            if (emailInput && emailInput.offsetWidth > 0) {
+                if (emailInput.value !== acc.email) {
+                    setDebug(`Dang dien Email: ${acc.email}`, '#0284c7');
+                    safeFill(emailInput, acc.email);
+                }
+            }
+
+            if (passInput && passInput.offsetWidth > 0 && acc.mkCapital) {
+                if (passInput.value !== acc.mkCapital) {
+                    setDebug('Dang dien Mat khau Capital cu...', '#0284c7');
+                    safeFill(passInput, acc.mkCapital);
+                }
+            }
+
+            let loginBtn = document.querySelector('button[type="submit"].sign-in-primary-btn') ||
+                           document.querySelector('button[type="submit"]');
+
+            if (!loginBtn) {
+                loginBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                    const txt = (btn.textContent || '').trim().toLowerCase();
+                    return btn.offsetWidth > 0 && (txt === 'sign in' || (txt.includes('sign in') && !txt.includes('link') && !txt.includes('different') && !txt.includes('way')));
+                });
+            }
+
+            if (loginBtn && emailInput && emailInput.value.length > 0 && (passInput ? passInput.value.length > 0 : true)) {
+                window._signInClickCount = window._signInClickCount || 0;
+                window._lastSignInTime = window._lastSignInTime || 0;
+                const now = Date.now();
+
+                if (window._signInClickCount === 0 || (now - window._lastSignInTime >= 5000 && window._signInClickCount < 4)) {
+                    window._signInClickCount++;
+                    window._lastSignInTime = now;
+                    setDebug(`Click [Sign In/Continue] (${window._signInClickCount}/4)...`, '#16a34a');
+                    safeClick(loginBtn);
+                } else {
+                    if (window._signInClickCount >= 4) {
+                        setDebug(`Da click Sign In 4 lan, dang cho he thong load...`, '#eab308');
+                    } else {
+                        const waitTime = Math.ceil((5000 - (now - window._lastSignInTime)) / 1000);
+                        setDebug(`Da click Sign In lan ${window._signInClickCount}, doi ${waitTime}s de thu lai...`, '#eab308');
+                    }
+                }
+                return;
+            }
+            return;
+        }
+
+        // 3. KIEM TRA LOGGED IN (USER MENU) DE CHUYEN HUONG
+        const hasUserMenu = document.querySelector('[data-testid="account-nav-menu"]') ||
+                            document.getElementById('radix-_r_0_') ||
+                            Array.from(document.querySelectorAll('button')).some(btn => {
+                                return btn.getAttribute('aria-haspopup') === 'menu' || btn.getAttribute('aria-expanded') !== null;
+                            });
+
+        if (hasUserMenu || (path !== '/sign-in' && !path.includes('/sign-in') && !path.includes('/auth/signin'))) {
+            clearInterval(interval);
+            if (isAutoCheck) {
+                reportResult(acc, 'ok');
+            } else {
+                setDebug('Dang nhap thanh cong! Dang chuyen huong sang trang Profile...', '#16a34a');
+                window.location.href = 'https://capitaloneshopping.com/account-settings/profile';
+            }
+            return;
+        }
+
+        // 4. KIEM TRA SIGN IN LINK DE CLICK VAO
+        const signInLink = Array.from(document.querySelectorAll('a, button')).find(el => {
+            const txt = (el.textContent || '').trim().toLowerCase();
+            const href = el.getAttribute('href') || '';
+            const isClassSignIn = el.className && typeof el.className === 'string' && el.className.toLowerCase().includes('signin');
+            return el.offsetWidth > 0 && (href === '/sign-in' || txt === 'sign in' || isClassSignIn);
+        });
+
+        if (signInLink && signInLink.offsetWidth > 0) {
+            setDebug('Click chuyen huong den trang [Sign In]...', '#0284c7');
+            safeClick(signInLink);
+            return;
+        }
+    }
+})();

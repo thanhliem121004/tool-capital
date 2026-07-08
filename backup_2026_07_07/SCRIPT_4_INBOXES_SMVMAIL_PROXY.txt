@@ -1,0 +1,493 @@
+// ==UserScript==
+// @name         Inboxes & SMVmail OTP Auto Scraper & Bridge
+// @namespace    http://tampermonkey.net/
+// @version      1.1
+// @description  Tu dong Add Inbox tren inboxes.com va cao OTP gui ve local bridge
+// @author       Antigravity AI
+// @match        https://inboxes.com/*
+// @match        https://smvmail.com/email/*
+// @grant        GM_xmlhttpRequest
+// @connect      127.0.0.1
+// @connect      localhost
+// @connect      inboxes.com
+// @connect      smvmail.com
+// @run-at       document-end
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    const API_OTP_BRIDGE = 'http://127.0.0.1:3000/api/otp-bridge';
+    const API_CURRENT_ACCOUNT = 'http://127.0.0.1:3000/api/current-account';
+
+    // Bang debug trang thai
+    const debugDiv = document.createElement('div');
+    debugDiv.style.position = 'fixed';
+    debugDiv.style.bottom = '10px';
+    debugDiv.style.right = '10px';
+    debugDiv.style.background = '#0f172a';
+    debugDiv.style.color = 'white';
+    debugDiv.style.padding = '12px 16px';
+    debugDiv.style.borderRadius = '8px';
+    debugDiv.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';
+    debugDiv.style.zIndex = '9999999';
+    debugDiv.style.fontSize = '12px';
+    debugDiv.style.fontFamily = 'monospace';
+    debugDiv.innerHTML = '[Bridge] Dang khoi dong...';
+    document.body.appendChild(debugDiv);
+
+    function setDebug(msg, color = '#0f172a') {
+        debugDiv.style.background = color;
+        debugDiv.innerHTML = '[Bridge]<br>' + msg;
+    }
+
+    let isAddingInbox = false;
+
+    function safeFill(element, value) {
+        if (!element) return false;
+        try {
+            element.focus();
+            const prototype = Object.getPrototypeOf(element);
+            const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+            if (descriptor && descriptor.set) {
+                descriptor.set.call(element, value);
+            } else {
+                element.value = value;
+            }
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+        } catch (e) {
+            element.value = value;
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        return true;
+    }
+
+    function safeClick(element) {
+        if (!element) return false;
+        try {
+            element.focus();
+
+            // 1. Thu goi truc tiep React Event Handlers (Bypass React Aria & isTrusted)
+            const reactPropsKey = Object.keys(element).find(key =>
+                key.startsWith('__reactProps$') ||
+                key.startsWith('__reactEventHandlers$') ||
+                key.startsWith('__reactInternalInstance$')
+            );
+            if (reactPropsKey && element[reactPropsKey]) {
+                const props = element[reactPropsKey];
+                if (typeof props.onClick === 'function') {
+                    try { props.onClick({ preventDefault: () => {}, stopPropagation: () => {}, target: element, currentTarget: element }); } catch(e) {}
+                }
+                if (typeof props.onPointerDown === 'function') {
+                    try { props.onPointerDown({ preventDefault: () => {}, stopPropagation: () => {}, target: element, currentTarget: element }); } catch(e) {}
+                }
+                if (typeof props.onPress === 'function') {
+                    try { props.onPress({ preventDefault: () => {}, stopPropagation: () => {}, target: element, currentTarget: element }); } catch(e) {}
+                }
+            }
+
+            // 2. Dispatch PointerEvents & MouseEvents voi day du thuoc tinh va do tre cho React Aria
+            const rect = element.getBoundingClientRect();
+            const x = rect.left + rect.width / 2 + (Math.random() * 4 - 2);
+            const y = rect.top + rect.height / 2 + (Math.random() * 4 - 2);
+
+            const eventOpts = {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                clientX: x,
+                clientY: y,
+                screenX: x + (window.screenLeft || window.screenX || 0),
+                screenY: y + (window.screenTop || window.screenY || 0),
+                button: 0,
+                buttons: 1
+            };
+
+            const pointerOpts = Object.assign({}, eventOpts, {
+                pointerId: 1,
+                pointerType: 'mouse',
+                width: 1,
+                height: 1,
+                pressure: 0.5,
+                isPrimary: true
+            });
+
+            // Gui Down events
+            element.dispatchEvent(new PointerEvent('pointerdown', pointerOpts));
+            element.dispatchEvent(new MouseEvent('mousedown', eventOpts));
+
+            if (typeof element.focus === 'function') {
+                element.focus();
+            }
+
+            // Tri hoan 50ms de mo phong cu click chuot that (React Aria yeu cau do tre pointerdown -> pointerup)
+            setTimeout(() => {
+                element.dispatchEvent(new PointerEvent('pointerup', pointerOpts));
+                element.dispatchEvent(new MouseEvent('mouseup', eventOpts));
+
+                const clickEv = new MouseEvent('click', eventOpts);
+                element.dispatchEvent(clickEv);
+
+                // Dispatch Enter & Space key events
+                element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13 }));
+                element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13 }));
+                element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: ' ', code: 'Space', keyCode: 32 }));
+                element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: ' ', code: 'Space', keyCode: 32 }));
+
+                if (typeof element.click === 'function') {
+                    element.click();
+                }
+            }, 50);
+        } catch (e) {
+            console.error('[Tampermonkey] Loi safeClick:', e);
+            try { element.click(); } catch(err) {}
+        }
+        return true;
+    }
+
+    function makeRequest(url, method, data, callback) {
+        if (typeof GM_xmlhttpRequest !== 'undefined') {
+            GM_xmlhttpRequest({
+                method: method,
+                url: url,
+                headers: { "Content-Type": "application/json" },
+                data: data ? JSON.stringify(data) : null,
+                onload: function(res) { callback(null, res.responseText); },
+                onerror: function(err) { callback(err, null); }
+            });
+        }
+    }
+
+    function extractOtpFromHtml(html, text) {
+        if (text) {
+            const matches = text.match(/\b\d{6}\b/g);
+            if (matches) {
+                const otp = matches.find(m => m !== '707070');
+                if (otp) return otp;
+            }
+        }
+        let cleaned = html || '';
+        cleaned = cleaned.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+        cleaned = cleaned.replace(/style="[^"]*"/gi, '');
+        cleaned = cleaned.replace(/style='[^']*'/gi, '');
+        cleaned = cleaned.replace(/<[^>]+>/g, ' ');
+        const matchesCleaned = cleaned.match(/\b\d{6}\b/g);
+        if (matchesCleaned) {
+            const otp = matchesCleaned.find(m => m !== '707070');
+            return otp || matchesCleaned[0];
+        }
+        return null;
+    }
+
+    function scrapOtpFromDOM() {
+        const pageText = document.body.innerText || '';
+        const matches = pageText.match(/\b\d{6}\b/g);
+        if (matches) {
+            const otp = matches.find(m => m !== '707070');
+            if (otp) {
+                const lowerText = pageText.toLowerCase();
+                const isMicrosoft = lowerText.includes('microsoft') || lowerText.includes('ma bao mat') || lowerText.includes('security code') || lowerText.includes('mã bảo mật');
+                if (isMicrosoft) {
+                    return otp;
+                }
+            }
+        }
+        return null;
+    }
+
+    function handleAutoAddInbox(email) {
+        if (isAddingInbox) return;
+        const parts = email.split('@');
+        const username = parts[0];
+        const domain = parts[1];
+        if (!username || !domain) return;
+
+        // 0. CHECK VA XOA HOM THU CU TRUOC KHI ADD HOM THU MOI
+        const deleteBtn = Array.from(document.querySelectorAll('button, a, span')).find(btn => {
+            const txt = (btn.textContent || '').trim().toLowerCase();
+            return btn.offsetWidth > 0 && txt.includes('delete inbox');
+        });
+
+        if (deleteBtn && deleteBtn.offsetWidth > 0) {
+            setDebug('Phat hien hom thu cu. Dang click [Delete Inbox]...', '#be123c');
+            const targetBtn = deleteBtn.closest('button, a, [role="button"]') || deleteBtn;
+            safeClick(targetBtn);
+
+            // Tim nut xac nhan xoa trong popup sau 400ms
+            setTimeout(() => {
+                const confirmDeleteBtn = Array.from(document.querySelectorAll('button, a, span')).find(btn => {
+                    const txt = (btn.textContent || '').trim().toLowerCase();
+                    return btn.offsetWidth > 0 && (txt === 'delete' || txt === 'yes' || txt.includes('confirm') || btn.classList.contains('bg-red-600') || btn.className.includes('bg-red'));
+                });
+                if (confirmDeleteBtn) {
+                    setDebug('Click xac nhan xoa hom thu cu...', '#be123c');
+                    const targetConfirm = confirmDeleteBtn.closest('button, a, [role="button"]') || confirmDeleteBtn;
+                    safeClick(targetConfirm);
+                }
+            }, 400);
+            return; // Dung lai de cho hom thu duoc xoa
+        }
+
+        // 1. Kiem tra xem popup "Add Inbox" da hien thi chua
+        const usernameInput = document.querySelector('input[placeholder*="username"]') ||
+                              document.querySelector('input[placeholder*="Username"]') ||
+                              Array.from(document.querySelectorAll('input')).find(input => {
+                                  const ph = (input.placeholder || '').toLowerCase();
+                                  return ph.includes('username') || ph.includes('name') || input.id === 'username';
+                              });
+
+        if (usernameInput && usernameInput.offsetWidth > 0) {
+            // Popup dang mo -> Tien hanh dien va chon
+
+            // A. Dien username
+            if (usernameInput.value !== username) {
+                setDebug(`Dien username: ${username}`, '#0284c7');
+                safeFill(usernameInput, username);
+                return;
+            }
+
+            // B. Chon domain
+            // Cach 1: Thu tim va doi gia tri qua the select truyen thong neu co
+            const nativeSelect = document.querySelector('select');
+            let isDomainMatched = false;
+
+            if (nativeSelect && nativeSelect.offsetWidth > 0) {
+                const targetOption = Array.from(nativeSelect.options).find(opt => {
+                    const txt = (opt.text || opt.value || '').toLowerCase();
+                    return txt.includes(domain);
+                });
+                if (targetOption) {
+                    if (nativeSelect.value !== targetOption.value) {
+                        setDebug(`Dien domain (native select): ${domain}`, '#0284c7');
+                        nativeSelect.value = targetOption.value;
+                        nativeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                        nativeSelect.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    isDomainMatched = true;
+                }
+            }
+
+            // Cach 2: Tim va click Custom Select Dropdown
+            let selectBtn = null;
+            if (!isDomainMatched) {
+                const popupContainer = usernameInput.closest('div.fixed, div.absolute, [role="dialog"], [class*="modal"]') || document;
+                selectBtn = popupContainer.querySelector('button[id*="domain"]') ||
+                            Array.from(popupContainer.querySelectorAll('button, div, span, p, label')).find(el => {
+                                const txt = (el.textContent || '').trim().toLowerCase();
+                                const isSuffix = txt.endsWith('.com') || txt.endsWith('.work') || txt.endsWith('.info') || txt.includes('.com') || txt.includes('.work') || txt.includes('.info');
+                                return el.offsetWidth > 0 && isSuffix && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA' && !el.closest('header') && !el.closest('footer') && !el.closest('nav');
+                            });
+
+                if (selectBtn) {
+                    const currentSelected = (selectBtn.textContent || '').trim().toLowerCase();
+                    if (currentSelected.includes(domain)) {
+                        isDomainMatched = true;
+                    } else {
+                        // Thu quet xem dropdown option co hien thi tren man hinh khong
+                        const optionEl = Array.from(document.querySelectorAll('div, li, span, a, p')).find(el => {
+                            const txt = (el.textContent || '').trim().toLowerCase();
+                            return el.offsetWidth > 0 && 
+                                   (txt === domain || txt === '@' + domain || txt === '.' + domain || txt.includes(domain)) && 
+                                   !el.closest('header') && !el.closest('footer') && !el.closest('nav');
+                        });
+
+                        if (optionEl) {
+                            setDebug(`Chon domain: ${domain}`, '#0284c7');
+                            const targetBtn = optionEl.closest('button, a, [role="button"], div, li') || optionEl;
+                            safeClick(targetBtn);
+                        } else {
+                            setDebug(`Click mo dropdown domain...`, '#0284c7');
+                            const targetBtn = selectBtn.closest('button, a, [role="button"], [role="combobox"]') || selectBtn;
+                            safeClick(targetBtn);
+                        }
+                        return; // Dang chon domain -> return cho
+                    }
+                }
+            }
+
+            // C. Click Add Inbox xac nhan trong popup (Chi khi username da dung VA domain da dung!)
+            if (usernameInput.value === username && isDomainMatched) {
+                const confirmBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                    const txt = (btn.textContent || '').trim().toLowerCase();
+                    const hasColor = btn.className.includes('bg-primary') || btn.className.includes('bg-blue') || btn.className.includes('bg-indigo') || btn.className.includes('text-white') || btn.className.includes('bg-indigo-600');
+                    return txt === 'add inbox' && hasColor;
+                });
+
+                if (confirmBtn && confirmBtn.offsetWidth > 0) {
+                    setDebug(`Click Add Inbox tao hom thu...`, '#16a34a');
+                    isAddingInbox = true;
+                    const targetBtn = confirmBtn.closest('button, a, [role="button"]') || confirmBtn;
+                    safeClick(targetBtn);
+                    setTimeout(() => { isAddingInbox = false; }, 3000);
+                }
+            }
+        } else {
+            // Kiem tra xem co nut "Get my first inbox!" cua trang chu khong
+            const getFirstInboxBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                const txt = (btn.textContent || '').trim().toLowerCase();
+                return txt.includes('get my first inbox');
+            });
+
+            if (getFirstInboxBtn && getFirstInboxBtn.offsetWidth > 0) {
+                setDebug(`Click [Get my first inbox]...`, '#0284c7');
+                safeClick(getFirstInboxBtn);
+                return;
+            }
+
+            // Popup chua mo -> Tim click nut "Add Inbox" o trang chinh
+            const openPopupBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                const txt = (btn.textContent || '').trim().toLowerCase();
+                return txt === 'add inbox' && btn.className.includes('bg-indigo-600');
+            });
+
+            if (openPopupBtn && openPopupBtn.offsetWidth > 0) {
+                setDebug(`Click [Add Inbox] mo popup...`, '#0284c7');
+                safeClick(openPopupBtn);
+            }
+        }
+    }
+
+    function fetchAndPostOtp(email) {
+        const host = window.location.host.toLowerCase();
+        if (host.includes('smvmail.com')) {
+            const url = `https://smvmail.com/api/email?page=1&q=&email=${encodeURIComponent(email)}&_t=${Date.now()}`;
+            makeRequest(url, "GET", null, function(err, responseText) {
+                if (err) return;
+                try {
+                    const json = JSON.parse(responseText);
+                    const docs = json.data?.docs || json.data?.data?.docs || json.docs || [];
+                    for (const doc of docs) {
+                        const subject = (doc.subject || '').toLowerCase();
+                        const isMatch = subject.includes('microsoft') || subject.includes('ma bao mat') || subject.includes('mã bảo mật') ||
+                                        (doc.text && (doc.text.toLowerCase().includes('microsoft') || doc.text.toLowerCase().includes('mã bảo mật'))) ||
+                                        (doc.html && (doc.html.toLowerCase().includes('microsoft') || doc.html.toLowerCase().includes('mã bảo mật')));
+
+                        if (isMatch) {
+                            const otp = extractOtpFromHtml(doc.html, doc.text);
+                            if (otp) {
+                                setDebug(`Phat hien OTP SMVmail: ${otp}`, '#22c55e');
+                                makeRequest(API_OTP_BRIDGE, "POST", { email: email, otp: otp }, function() {});
+                                break;
+                            }
+                        }
+                    }
+                } catch(e) {}
+            });
+        } else if (host.includes('inboxes.com')) {
+            const listUrl = `https://inboxes.com/api/v2/inbox/${encodeURIComponent(email)}?_t=${Date.now()}`;
+            makeRequest(listUrl, "GET", null, function(err, responseText) {
+                if (err) return;
+                try {
+                    const data = JSON.parse(responseText);
+                    const messages = data.msgs || [];
+                    const targetMsg = messages.find(msg => {
+                        const sender = (msg.f || '').toLowerCase();
+                        const subj = (msg.s || '').toLowerCase();
+                        return sender.includes('microsoft') || subj.includes('microsoft') || subj.includes('ma bao mat') || subj.includes('mã bảo mật') || subj.includes('security code');
+                    });
+
+                    if (targetMsg) {
+                        const bodyUrl = `https://inboxes.com/api/v2/message/${encodeURIComponent(targetMsg.uid)}`;
+                        makeRequest(bodyUrl, "GET", null, function(err, bodyResponseText) {
+                            if (err) return;
+                            try {
+                                const bodyData = JSON.parse(bodyResponseText);
+                                const otp = extractOtpFromHtml(bodyData.html, bodyData.text);
+                                if (otp) {
+                                    setDebug(`Phat hien OTP Inboxes: ${otp}`, '#22c55e');
+                                    makeRequest(API_OTP_BRIDGE, "POST", { email: email, otp: otp }, function() {});
+                                }
+                            } catch(e) {}
+                        });
+                    } else {
+                        setDebug(`Dang doi OTP Microsoft gui ve: ${email}...`, '#eab308');
+                    }
+                } catch(e) {}
+            });
+        }
+    }
+
+    // Vong lap chinh dong bo va chay
+    setInterval(() => {
+        makeRequest(API_CURRENT_ACCOUNT, "GET", null, function(err, responseText) {
+            if (err) {
+                setDebug('Loi dong bo Tool local...', '#ef4444');
+                return;
+            }
+            try {
+                const resData = JSON.parse(responseText);
+                const account = resData?.account;
+                const recoveryEmail = account?.recovery || account?.newRecovery;
+                if (resData.success && account && recoveryEmail) {
+                    const email = recoveryEmail.toLowerCase().trim();
+                    const pageText = (document.body.innerText || '').toLowerCase();
+                    const isMailboxActive = pageText.includes(email);
+
+                    // 1. Uu tien cao OTP truc tiep tu DOM neu nguoi dung dang mo trang doc thu
+                    const domOtp = scrapOtpFromDOM();
+                    if (domOtp) {
+                        setDebug(`Phat hien OTP tu man hinh: ${domOtp}`, '#22c55e');
+                        makeRequest(API_OTP_BRIDGE, "POST", { email: email, otp: domOtp }, function() {});
+                        return;
+                    }
+
+                    // 2. Kiem tra va tu dong click mo email Microsoft neu dang o trang danh sach
+                    if (window.location.host.includes('inboxes.com') && isMailboxActive) {
+                        const isReadingPage = window.location.pathname.includes('/read/');
+                        if (!isReadingPage) {
+                            // Tìm phần tử sâu nhất có chứa chữ "microsoft" và là một row có thể click được
+                            const allElements = Array.from(document.querySelectorAll('*'));
+                            let targetRow = null;
+                            for (let i = allElements.length - 1; i >= 0; i--) {
+                                const el = allElements[i];
+                                if (el.offsetWidth === 0) continue;
+                                if (el.tagName === 'BODY' || el.tagName === 'HTML' || el.tagName === 'MAIN') continue;
+                                if (el.closest('header') || el.closest('footer') || el.closest('nav') || el.closest('.sidebar')) continue;
+
+                                const txt = (el.innerText || el.textContent || '').toLowerCase();
+                                if (txt.includes('microsoft') || txt.includes('ma bao mat') || txt.includes('security code') || txt.includes('mã bảo mật')) {
+                                    // Kiểm tra xem phần tử này có phải là thẻ click được không
+                                    if (el.tagName === 'A' || el.tagName === 'TR' || el.tagName === 'LI' || el.tagName === 'TD' ||
+                                        el.classList.contains('cursor-pointer') ||
+                                        getComputedStyle(el).cursor === 'pointer' ||
+                                        el.getAttribute('role') === 'row' ||
+                                        el.getAttribute('role') === 'button' ||
+                                        el.getAttribute('role') === 'cell') {
+                                        targetRow = el;
+                                        break; // Đã tìm thấy phần tử sâu nhất hợp lệ
+                                    }
+                                }
+                            }
+
+                            if (targetRow) {
+                                const debugClass = targetRow.className ? `.${targetRow.className.replace(/ /g, '.')}` : '';
+                                setDebug(`🎯 Click mo thu Microsoft: <${targetRow.tagName.toLowerCase()}${debugClass}>...`, '#0284c7');
+
+                                // Dùng hàm safeClick đã được tối ưu thay vì click thủ công
+                                safeClick(targetRow);
+                                // Click thêm thẻ a bên trong nếu có (đề phòng)
+                                const link = targetRow.querySelector('a');
+                                if (link) safeClick(link);
+
+                                return;
+                            }
+                        }
+                    }
+
+                    // 3. Chay luong tao hom thu hoac check API ngam
+                    if (window.location.host.includes('inboxes.com') && !isMailboxActive) {
+                        handleAutoAddInbox(email);
+                    } else {
+                        fetchAndPostOtp(email);
+                    }
+                } else {
+                    setDebug('Cho thong tin email khoi phuc moi tu Tool...', '#eab308');
+                }
+            } catch(e) {
+                console.error(e);
+            }
+        });
+    }, 2000);
+})();
+

@@ -55,6 +55,9 @@ export async function POST(request: NextRequest) {
       code: string;
       isDone: boolean;
       isPasswordError?: boolean;
+      firstName?: string;
+      lastName?: string;
+      zipCode?: string;
     };
 
     const rows: Row[] = [];
@@ -62,7 +65,41 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < values.length; i++) {
       const r = values[i];
 
-      if (mode === 'capital') {
+      if (mode === 'capital_reg') {
+         const name = String(r?.[0] ?? '').trim();
+         const date = String(r?.[1] ?? '').trim();
+         const email = String(r?.[2] ?? '').trim();
+         const password = String(r?.[3] ?? '').trim(); // Mk mail
+         const recovery = String(r?.[4] ?? '').trim(); // Mail khôi phục
+         const mkCapital = String(r?.[5] ?? '').trim(); // Mk capital
+         const codeId = String(r?.[6] ?? '').trim(); // Code ID chứa chuỗi dài
+         const firstName = String(r?.[7] ?? '').trim();
+         const lastName = String(r?.[8] ?? '').trim();
+         const zipCode = String(r?.[9] ?? '').trim();
+ 
+         // Chỉ lấy những dòng có email, chưa có Mk capital
+         if (!email) continue;
+         
+         const isDone = mkCapital.length > 0;
+         
+         // Tách codeId lấy refreshToken và clientId nếu cần ở client, nhưng tạm cứ trả về toàn bộ chuỗi
+         
+         rows.push({
+           rowIndex: i + 2,
+           name,
+           date,
+           email,
+           password,
+           recovery,
+           mkCapital,
+           code: codeId,
+           isDone,
+           isPasswordError: false,
+           firstName,
+           lastName,
+           zipCode,
+         });
+      } else if (mode === 'capital') {
         const email = String(r?.[0] ?? '').trim();
         // Bỏ qua hàng trống
         if (!email) continue;

@@ -8,9 +8,31 @@ import { RowCard } from './components/RowCard';
 import { MercuryCard } from './components/MercuryCard';
 import { YouTubePlayer } from './components/YouTubePlayer';
 
-const DEFAULT_SHEET_ID = '1AB2LGfQqGP5es9nU2vMuwldI1HabyV1pyrVOhOC4GRE';
+const DEFAULT_SHEET_ID = '1u976gsls9ysmeVocrrzuFJZBOGAU6vTKFVE7H8w2WJE';
 const DEFAULT_SHEET_NAME = 'Sheet1';
 const WEB_MAIL_KP_URL = 'https://login.live.com/login.srf?wa=wsignin1.0&rpsnv=198&ct=1782607399&rver=7.5.2211.0&wp=SA_20MIN&wreply=https%3A%2F%2Faccount.live.com%2Fproofs%2FManage%2Fadditional%3Fuaid%3D233239318fd1447bab2b4edd22546006&lc=1033&id=38936&mkt=vi-VN&uaid=233239318fd1447bab2b4edd22546006';
+
+const safeLocalStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      if (typeof window !== 'undefined') {
+        return window.localStorage.getItem(key);
+      }
+    } catch (e) {
+      console.warn('[Storage] Cannot read localStorage:', e);
+    }
+    return null;
+  },
+  setItem: (key: string, value: string): void => {
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(key, value);
+      }
+    } catch (e) {
+      console.warn('[Storage] Cannot write localStorage:', e);
+    }
+  }
+};
 
 export default function Home() {
   const { sheetId, setSheetId, sheetName, setSheetName, mode, setMode, rows, loading, error, fetchRows, patchRow
@@ -25,6 +47,7 @@ export default function Home() {
   const [iframeKey, setIframeKey] = useState(0);
   const [mailProvider, setMailProvider] = useState<'inboxes' | 'fvia'>('inboxes');
   const [preferredDomain, setPreferredDomain] = useState('random');
+  const [activeEmail, setActiveEmail] = useState<string>('');
 
   // States dành riêng cho chế độ Mercury
   const [mercuryRows, setMercuryRows] = useState<any[]>([]);
@@ -68,7 +91,7 @@ export default function Home() {
       if (event.data.type === 'FVIA_TOKEN' && event.data.token) {
         setFviaToken(event.data.token);
         setFviaError('');
-        localStorage.setItem('fviaToken', event.data.token);
+        safeLocalStorage.setItem('fviaToken', event.data.token);
       } else if (event.data.type === 'FVIA_ERROR') {
         if (event.data.msg) {
           setFviaError(event.data.msg);
@@ -83,19 +106,25 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const saved = localStorage.getItem('selectedName');
-    if (saved) {
-      setSelectedName(saved);
-    }
-    const savedToken = localStorage.getItem('fviaToken');
-    if (savedToken) {
-      setFviaToken(savedToken);
+    const savedId = safeLocalStorage.getItem('sheetId');
+    const savedName = safeLocalStorage.getItem('sheetName');
+    const savedToken = safeLocalStorage.getItem('fviaToken');
+    const savedZingProxy = safeLocalStorage.getItem('zingProxyUrl');
+    
+    if (savedId) setSheetId(savedId);
+    if (savedName) setSheetName(savedName);
+    if (savedToken) setFviaToken(savedToken);
+    if (savedZingProxy) setZingProxyUrl(savedZingProxy);
+    
+    const savedNameLocal = safeLocalStorage.getItem('selectedName');
+    if (savedNameLocal) {
+      setSelectedName(savedNameLocal);
     }
   }, []);
 
   const handleNameChange = (name: string) => {
     setSelectedName(name);
-    localStorage.setItem('selectedName', name);
+    safeLocalStorage.setItem('selectedName', name);
   };
   const [statusFilter, setStatusFilter] = useState<'all' | 'done' | 'not-done'>('all');
   const [capitalFilter, setCapitalFilter] = useState<'all' | 'error' | 'ok'>('all');
@@ -142,6 +171,8 @@ export default function Home() {
       });
       return result;
     }
+
+
 
     const result = rows.filter(r => {
       if (mode !== 'capital' && selectedName && selectedName !== 'all' && r.name !== selectedName) return false;
@@ -194,10 +225,9 @@ export default function Home() {
     return filtered.length - doneCount;
   }, [filtered, mercuryRows, mode, doneCount]);
 
-  // Phân trang gọn gàng (Pagination)
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(6);
-  const [activeEmail, setActiveEmail] = useState('');
+  const [zingProxyUrl, setZingProxyUrl] = useState('');
   
   // Reset trang về 1 khi các bộ lọc thay đổi
   useEffect(() => {
@@ -210,12 +240,160 @@ export default function Home() {
     const start = (currentPage - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
   }, [filtered, currentPage, pageSize]);
-
   const [bulkChecking, setBulkChecking] = useState(false);
   const [bulkCheckProgress, setBulkCheckProgress] = useState({ current: 0, total: 0 });
   const [bulkCheckStatusText, setBulkCheckStatusText] = useState('');
   const [startRowInput, setStartRowInput] = useState('2');
   const [autoNext, setAutoNext] = useState(false);
+  const [runDirectly, setRunDirectly] = useState(() => {
+    return safeLocalStorage.getItem('runDirectly') === 'true';
+  });
+
+  const handleRunDirectlyChange = (val: boolean) => {
+    setRunDirectly(val);
+    safeLocalStorage.setItem('runDirectly', String(val));
+  };
+
+
+  const generateCapitalRegUrl = (row: any, sheetId: string, sheetName: string) => {
+    const accData = {
+      sheetId,
+      sheetName,
+      rowIndex: row.rowIndex,
+      email: row.email,
+      pass: row.password,
+      code: row.code,
+      recovery: row.recovery,
+      oldRecovery: row.oldRecovery,
+      isAutoReg: true
+    };
+    const jsonStr = JSON.stringify(accData);
+    const base64Data = btoa(unescape(encodeURIComponent(jsonStr)));
+    return `https://capitaloneshopping.com/onboarding/base#capitalReg=${base64Data}`;
+  };
+
+  const handleBulkCapitalReg = async () => {
+    setBulkChecking(true);
+    setBulkCheckStatusText('⏳ Đang chuẩn bị đăng ký Capital...');
+    
+    const latestRows = await fetchRows();
+    const startRowVal = parseInt(startRowInput, 10) || 2;
+    
+    const filteredLatest = latestRows.filter((r: any) => {
+      if (statusFilter === 'done' && !r.isDone) return false;
+      if (statusFilter === 'not-done' && r.isDone) return false;
+      if (searchText) {
+        const q = searchText.toLowerCase();
+        const hay = (r.name + ' ' + r.email + ' ' + (r.recovery || '')).toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    const targets = filteredLatest.filter((r: any) => !r.isDone && r.rowIndex >= startRowVal);
+    
+    if (targets.length === 0) {
+      setBulkChecking(false);
+      setBulkCheckStatusText('');
+      alert(`Không có tài khoản nào có số dòng >= ${startRowVal} phù hợp để tạo Capital!`);
+      return;
+    }
+
+    if (!window.confirm(`Bạn có chắc chắn muốn TỰ ĐỘNG đăng ký Capital cho ${targets.length} tài khoản (từ dòng ${startRowVal}) không?`)) {
+      setBulkChecking(false);
+      setBulkCheckStatusText('');
+      return;
+    }
+
+    setBulkCheckProgress({ current: 0, total: targets.length });
+    
+    for (let i = 0; i < targets.length; i++) {
+      const row = targets[i];
+      setBulkCheckProgress({ current: i + 1, total: targets.length });
+
+      if (zingProxyUrl) {
+        setBulkCheckStatusText(`Đang xoay IP qua ZingProxy...`);
+        try {
+          await fetch(zingProxyUrl, { mode: 'no-cors' });
+          await new Promise(r => setTimeout(r, 4000)); // Đợi 4s cho IP thay đổi hoàn tất
+        } catch (e) {
+          console.error('Xoay IP lỗi:', e);
+        }
+      }
+
+      let win: Window | null = null;
+      setBulkCheckStatusText(`Đang mở 2 tab đăng ký trực tiếp cho #${row.rowIndex} (${row.email})...`);
+      const accData = {
+        sheetId,
+        sheetName,
+        rowIndex: row.rowIndex,
+        email: row.email,
+        pass: row.password,
+        code: row.code,
+        recovery: row.recovery,
+        oldRecovery: row.oldRecovery,
+        isAutoReg: true
+      };
+      const jsonStr = JSON.stringify(accData);
+      const base64Data = btoa(unescape(encodeURIComponent(jsonStr)));
+      const checkUrl = `https://capitaloneshopping.com/onboarding/base#capitalReg=${base64Data}`;
+      win = window.open(checkUrl, '_blank');
+      if (!win) {
+        console.error(`Không mở được tab mới. Vui lòng cấp quyền Popup!`);
+        setBulkCheckStatusText(`⚠️ Lỗi: Trình duyệt chặn Popup! Hãy bật 'Always cho phép popup' cho localhost rồi click chạy lại.`);
+        setBulkChecking(false);
+        return;
+      }
+
+      setBulkCheckStatusText(`Đang chờ Script Tampermonkey xử lý cho #${row.rowIndex}... (Tối đa 3 phút)`);
+      const startTime = Date.now();
+      const maxWaitTime = 180 * 1000;
+      let hasResult = false;
+
+      try {
+        while (Date.now() - startTime < maxWaitTime) {
+          await new Promise(r => setTimeout(r, 3000));
+
+          const statusRes = await fetch(`/api/capital-reg-status?email=${encodeURIComponent(row.email)}&_t=${Date.now()}`);
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            if (statusData.success && statusData.hasResult) {
+              const result = statusData.result;
+              if (result.status === 'ok') {
+                patchRow(row.rowIndex, { isDone: true, mkCapital: result.mkCapital });
+                setBulkCheckStatusText(`✅ Tài khoản #${row.rowIndex} tạo thành công!`);
+              } else {
+                setBulkCheckStatusText(`❌ Tài khoản #${row.rowIndex} lỗi: ${result.errorMsg}`);
+              }
+              hasResult = true;
+              break;
+            }
+          }
+        }
+
+        if (!hasResult) {
+          setBulkCheckStatusText(`⚠️ Quá thời gian chờ đăng ký cho #${row.rowIndex}. Chuyển sang acc tiếp theo...`);
+        }
+      } catch (e) {
+        console.error(`Lỗi khi tạo hàng #${row.rowIndex}:`, e);
+      } finally {
+        if (win) {
+          try {
+            win.close();
+          } catch (closeErr) {
+            console.error('[AdsPower Auto-Close] Không đóng được tab:', closeErr);
+          }
+        }
+      }
+      
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
+    setBulkChecking(false);
+    setBulkCheckStatusText('Hoàn thành đăng ký hàng loạt!');
+    alert('Đã hoàn thành đăng ký hàng loạt tài khoản Capital One!');
+    fetchRows();
+  };
 
   const handleBulkCheckCapital = async () => {
     setBulkChecking(true);
@@ -405,6 +583,12 @@ export default function Home() {
                 >
                   Mercury Reg
                 </button>
+                <button
+                  onClick={() => { setMode('capital_reg' as any); setSelectedName(''); }}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${mode === ('capital_reg' as any) ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                >
+                  Capital Reg
+                </button>
               </div>
 
               {/* Provider Toggle */}
@@ -456,41 +640,107 @@ export default function Home() {
                     </optgroup>
                   ) : (
                     <optgroup label="Fvia">
-                      <option value="fviainboxes.com">@fviainboxes.com</option>
-                      <option value="fviadropinbox.com">@fviadropinbox.com</option>
-                      <option value="fviamail.work">@fviamail.work</option>
-                      <option value="dropinboxes.com">@dropinboxes.com</option>
+                      <option value="fvia.net">@fvia.net</option>
+                      <option value="fvia.org">@fvia.org</option>
+                      <option value="fvia.io">@fvia.io</option>
+                      <option value="fvia.co">@fvia.co</option>
+                      <option value="fvia.biz">@fvia.biz</option>
+                      <option value="fviacorp.com">@fviacorp.com</option>
+                      <option value="fviacompany.com">@fviacompany.com</option>
+                      <option value="fviagroup.com">@fviagroup.com</option>
+                      <option value="fvialab.com">@fvialab.com</option>
+                      <option value="fviastudio.com">@fviastudio.com</option>
+                      <option value="fviaventures.com">@fviaventures.com</option>
+                      <option value="fviaholdings.com">@fviaholdings.com</option>
+                      <option value="fviasolutions.com">@fviasolutions.com</option>
+                      <option value="fviatechnologies.com">@fviatechnologies.com</option>
+                      <option value="fviainvestments.com">@fviainvestments.com</option>
+                      <option value="fviapartners.com">@fviapartners.com</option>
+                      <option value="fviacapital.com">@fviacapital.com</option>
+                      <option value="fviamanagement.com">@fviamanagement.com</option>
+                      <option value="fviaservices.com">@fviaservices.com</option>
+                      <option value="fviasystems.com">@fviasystems.com</option>
+                      <option value="fviaconsulting.com">@fviaconsulting.com</option>
+                      <option value="fviaglobal.com">@fviaglobal.com</option>
+                      <option value="fviainternational.com">@fviainternational.com</option>
+                      <option value="fviaenterprises.com">@fviaenterprises.com</option>
+                      <option value="fviainnovations.com">@fviainnovations.com</option>
+                      <option value="fvianetworks.com">@fvianetworks.com</option>
+                      <option value="fviacommerce.com">@fviacommerce.com</option>
+                      <option value="fvialogistics.com">@fvialogistics.com</option>
+                      <option value="fviaproperties.com">@fviaproperties.com</option>
+                      <option value="fviarealestate.com">@fviarealestate.com</option>
+                      <option value="fviaventures.net">@fviaventures.net</option>
+                      <option value="fviaholdings.net">@fviaholdings.net</option>
+                      <option value="fviasolutions.net">@fviasolutions.net</option>
+                      <option value="fviatechnologies.net">@fviatechnologies.net</option>
+                      <option value="fviainvestments.net">@fviainvestments.net</option>
+                      <option value="fviapartners.net">@fviapartners.net</option>
+                      <option value="fviacapital.net">@fviacapital.net</option>
+                      <option value="fviamanagement.net">@fviamanagement.net</option>
+                      <option value="fviaservices.net">@fviaservices.net</option>
+                      <option value="fviasystems.net">@fviasystems.net</option>
+                      <option value="fviaconsulting.net">@fviaconsulting.net</option>
+                      <option value="fviaglobal.net">@fviaglobal.net</option>
+                      <option value="fviainternational.net">@fviainternational.net</option>
+                      <option value="fviaenterprises.net">@fviaenterprises.net</option>
+                      <option value="fviainnovations.net">@fviainnovations.net</option>
+                      <option value="fvianetworks.net">@fvianetworks.net</option>
+                      <option value="fviacommerce.net">@fviacommerce.net</option>
+                      <option value="fvialogistics.net">@fvialogistics.net</option>
+                      <option value="fviaproperties.net">@fviaproperties.net</option>
+                      <option value="fviarealestate.net">@fviarealestate.net</option>
                     </optgroup>
                   )}
                 </select>
               </div>
+              {/* Fvia Token Input */}
+              {mailProvider === 'fvia' && (
+                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow-sm border w-full sm:w-auto">
+                  <span className="text-sm font-medium whitespace-nowrap">🔑 Fvia Token:</span>
+                  <input
+                    type="text"
+                    value={fviaToken}
+                    onChange={(e) => {
+                      setFviaToken(e.target.value);
+                      safeLocalStorage.setItem('fviaToken', e.target.value);
+                    }}
+                    placeholder="Nhập token fvia.net..."
+                    className="text-sm outline-none w-full sm:w-48 bg-transparent py-1 font-medium text-gray-700"
+                  />
+                  <button
+                    onClick={() => {
+                      setFviaToken('⏳ Đang lấy token mới...');
+                      setFviaError('');
+                      setIframeKey(k => k + 1);
+                    }}
+                    className="ml-2 text-gray-500 hover:text-blue-600 transition-colors"
+                    title="Làm mới Token (Tự động lấy lại)"
+                  >
+                    🔄
+                  </button>
+                </div>
+              )}
 
-              <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow-sm border w-full sm:w-auto">
-                <span className="text-sm font-medium whitespace-nowrap">🔑 Fvia Token:</span>
-                <input
-                  type="text"
-                  value={fviaToken}
-                  onChange={(e) => {
-                    setFviaToken(e.target.value);
-                    localStorage.setItem('fviaToken', e.target.value);
-                  }}
-                  placeholder="Nhập Token giải Captcha..."
-                  className="text-sm outline-none w-full sm:w-64 bg-transparent"
-                />
-                <button
-                  onClick={() => {
-                    setFviaToken('⏳ Đang lấy token mới...');
-                    setFviaError('');
-                    setIframeKey(k => k + 1);
-                  }}
-                  className="ml-2 text-gray-500 hover:text-blue-600 transition-colors"
-                  title="Làm mới Token (Tự động lấy lại)"
-                >
-                  🔄
-                </button>
-              </div>
-              
-              {fviaError && (
+              {/* ZingProxy Input */}
+              {mode === ('capital_reg' as any) && (
+                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow-sm border w-full sm:w-auto">
+                  <span className="text-sm font-medium whitespace-nowrap">🔄 Đổi IP Link:</span>
+                  <input
+                    type="text"
+                    value={zingProxyUrl}
+                    onChange={(e) => {
+                      setZingProxyUrl(e.target.value);
+                      safeLocalStorage.setItem('zingProxyUrl', e.target.value);
+                    }}
+                    placeholder="Nhập link ZingProxy..."
+                    className="text-sm outline-none w-full sm:w-48 bg-transparent py-1 font-medium text-gray-700"
+                  />
+                </div>
+              )}
+            </div>
+            
+            {fviaError && (
                 <div className="text-xs text-red-600 font-medium bg-red-50 border border-red-200 px-3 py-2 rounded-lg animate-pulse w-full sm:w-auto">
                   {fviaError}
                 </div>
@@ -504,7 +754,6 @@ export default function Home() {
                 title="Auto Captcha"
                 scrolling="no"
               />
-            </div>
             <button
               onClick={() => setShowForm(true)}
               className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium whitespace-nowrap"
@@ -532,8 +781,8 @@ export default function Home() {
               onSubmit={(id, name) => {
                 setSheetId(id);
                 setSheetName(name);
-                localStorage.setItem('sheetId', id);
-                localStorage.setItem('sheetName', name);
+                safeLocalStorage.setItem('sheetId', id);
+                safeLocalStorage.setItem('sheetName', name);
                 setShowForm(false);
               }}
             />
@@ -676,7 +925,7 @@ export default function Home() {
               >
                 🌐 Web mail KP
               </a>
-              {mode === 'capital' && rows.length > 0 && (
+              {(mode === 'capital' || mode === ('capital_reg' as any)) && rows.length > 0 && (
                 <div className="flex flex-wrap items-center gap-3 bg-indigo-50 border border-indigo-200 px-4 py-2 rounded-lg">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold text-indigo-700 whitespace-nowrap">Bắt đầu từ dòng:</span>
@@ -699,15 +948,27 @@ export default function Home() {
                       disabled={bulkChecking}
                       className="w-3.5 h-3.5 cursor-pointer rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                     />
-                    🔄 Tự động lưu & chạy tiếp (Auto-Next)
+                    🔄 {mode === ('capital_reg' as any) ? 'Tự động chạy liên tục' : 'Tự động lưu & chạy tiếp (Auto-Next)'}
+                  </label>
+
+                  {/* Run Directly Toggle (AdsPower / Proxy support) */}
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-indigo-700 bg-white border border-indigo-200 px-2.5 py-1.5 rounded hover:bg-indigo-100 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={runDirectly}
+                      onChange={(e) => handleRunDirectlyChange(e.target.checked)}
+                      disabled={bulkChecking}
+                      className="w-3.5 h-3.5 cursor-pointer rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    🌐 Chạy trực tiếp trình duyệt này (Cho AdsPower)
                   </label>
 
                   <button
-                    onClick={handleBulkCheckCapital}
+                    onClick={mode === ('capital_reg' as any) ? handleBulkCapitalReg : handleBulkCheckCapital}
                     disabled={bulkChecking || loading}
                     className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 font-bold transition-all text-sm whitespace-nowrap shadow-sm shadow-indigo-100"
                   >
-                    {bulkChecking ? `⏳ Đang check (${bulkCheckProgress.current}/${bulkCheckProgress.total})...` : '⚡ Check All Capital'}
+                    {bulkChecking ? `⏳ Đang xử lý (${bulkCheckProgress.current}/${bulkCheckProgress.total})...` : (mode === ('capital_reg' as any) ? '⚡ Auto Reg Capital' : '⚡ Check All Capital')}
                   </button>
                 </div>
               )}
@@ -835,6 +1096,8 @@ export default function Home() {
                     mode={mode}
                     activeEmail={activeEmail}
                     onActive={setActiveEmail}
+                    runDirectly={runDirectly}
+                    allRows={rows}
                   />
                 ))
               )}

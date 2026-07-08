@@ -1,0 +1,631 @@
+// ==UserScript==
+// @name         SCRIPT 9 - HOTMAIL AUTO LOGIN & READ (CAPITAL REG)
+// @namespace    http://tampermonkey.net/
+// @version      1.1
+// @description  Tự động đăng nhập Hotmail, vượt xác minh mail khôi phục (fviainboxes.com, smvmail.com) & đọc thư Capital One để lấy link reset password
+// @author       You
+// @match        *://login.live.com/*
+// @match        *://login.microsoftonline.com/*
+// @match        *://outlook.live.com/*
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_xmlhttpRequest
+// @connect      127.0.0.1
+// @connect      localhost
+// @connect      inboxes.com
+// @connect      smvmail.com
+// @run-at       document-start
+// ==/UserScript==
+
+
+(function() {
+    'use strict';
+
+    let debugDiv = null;
+    function initDebug() {
+        if (debugDiv) return;
+        debugDiv = document.createElement('div');
+        debugDiv.style.position = 'fixed';
+        debugDiv.style.top = '10px';
+        debugDiv.style.right = '10px';
+        debugDiv.style.background = '#0369a1';
+        debugDiv.style.color = 'white';
+        debugDiv.style.padding = '12px 16px';
+        debugDiv.style.borderRadius = '8px';
+        debugDiv.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';
+        debugDiv.style.zIndex = '9999999';
+        debugDiv.style.fontSize = '13px';
+        debugDiv.style.fontFamily = 'monospace';
+        debugDiv.style.lineHeight = '1.5';
+        debugDiv.style.maxWidth = '400px';
+        debugDiv.style.wordBreak = 'break-all';
+        debugDiv.innerHTML = '📬 [Hotmail Read] Khởi động...';
+        document.body.appendChild(debugDiv);
+    }
+
+    function setDebug(msg, color = '#0369a1') {
+        if (!debugDiv) initDebug();
+        debugDiv.style.background = color;
+        debugDiv.innerHTML = '📬 [Hotmail Read]<br>' + msg;
+    }
+
+    function getRegData() {
+        try {
+            const hash = window.location.hash;
+            if (hash && hash.includes('#capitalReg=')) {
+                const b64 = hash.split('#capitalReg=')[1];
+                const data = JSON.parse(atob(b64));
+                GM_setValue('capitalRegData', data);
+                return data;
+            }
+        } catch (e) {
+            console.error('Lỗi parse data từ Hash:', e);
+        }
+        
+        try {
+            const data = GM_getValue('capitalRegData');
+            if (data) {
+                return data;
+            }
+        } catch (e) {
+            console.error('Lỗi lấy data từ GM_getValue:', e);
+        }
+        return null;
+    }
+
+    let regData = null;
+
+    function wait(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function safeFill(element, value) {
+        if (!element) return false;
+        try {
+            element.focus();
+            const prototype = Object.getPrototypeOf(element);
+            const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+
+            if (descriptor && descriptor.set) {
+                descriptor.set.call(element, value);
+            } else {
+                element.value = value;
+            }
+
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+            element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: value }));
+            element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: value }));
+        } catch (e) {
+            console.error('[Tampermonkey] Lỗi safeFill:', e);
+            element.value = value;
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        return true;
+    }
+
+    function safeClick(element) {
+        if (!element) return false;
+        try {
+            element.focus();
+            
+            // Giả lập các sự kiện nhấn chuột trong try-catch riêng để tránh bị chặn tiến trình click gốc
+            try {
+                const rect = element.getBoundingClientRect();
+                const cx = rect.left + rect.width / 2;
+                const cy = rect.top + rect.height / 2;
+                // Loại bỏ 'view: window' để tránh lỗi TypeError khi Tampermonkey bọc window trong Proxy Sandbox
+                const opts = { bubbles: true, cancelable: true, clientX: cx, clientY: cy };
+
+                element.dispatchEvent(new PointerEvent('pointerdown', opts));
+                element.dispatchEvent(new MouseEvent('mousedown', opts));
+                element.dispatchEvent(new MouseEvent('mouseup', opts));
+                element.dispatchEvent(new PointerEvent('pointerup', opts));
+
+                const clickEvent = new MouseEvent('click', opts);
+                element.dispatchEvent(clickEvent);
+            } catch (simError) {
+                console.warn('[Tampermonkey] Lỗi giả lập click events:', simError);
+            }
+
+            // Luôn luôn gọi hàm click gốc để thực thi hành động mặc định của trình duyệt
+            if (typeof element.click === 'function') {
+                element.click();
+            }
+        } catch (e) {
+            console.error('[Tampermonkey] Lỗi safeClick:', e);
+        }
+        return true;
+    }
+
+
+    function extractOtpFromHtml(html, text) {
+        if (text) {
+            const matches = text.match(/\b\d{6}\b/g);
+            if (matches) {
+                const otp = matches.find(m => m !== '707070');
+                if (otp) return otp;
+            }
+        }
+        let cleaned = html || '';
+        cleaned = cleaned.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+        cleaned = cleaned.replace(/style="[^"]*"/gi, '');
+        cleaned = cleaned.replace(/style='[^']*'/gi, '');
+        cleaned = cleaned.replace(/<[^>]+>/g, ' ');
+        const matchesCleaned = cleaned.match(/\b\d{6}\b/g);
+        if (matchesCleaned) {
+            const otp = matchesCleaned.find(m => m !== '707070');
+            return otp || matchesCleaned[0];
+        }
+        return null;
+    }
+
+    function fetchOtpFromInboxesOrSmv(email, callback) {
+        const domain = email.split('@')[1]?.toLowerCase() || '';
+        const isSmv = domain === 'smvmail.com';
+
+        if (isSmv) {
+            const url = `https://smvmail.com/api/email?page=1&q=&email=${encodeURIComponent(email)}&_t=${Date.now()}`;
+            GM_xmlhttpRequest({
+                method: "GET",
+                url: url,
+                headers: {
+                    "Accept": "application/json, text/plain, */*",
+                    "User-Agent": navigator.userAgent
+                },
+                onload: function(res) {
+                    try {
+                        const json = JSON.parse(res.responseText);
+                        const docs = json.data?.docs || json.data?.data?.docs || json.docs || [];
+                        let foundOtp = null;
+                        for (const doc of docs) {
+                            const subject = (doc.subject || '').toLowerCase();
+                            if (subject.includes('microsoft') || (doc.text && doc.text.toLowerCase().includes('microsoft')) || (doc.html && doc.html.toLowerCase().includes('microsoft'))) {
+                                foundOtp = extractOtpFromHtml(doc.html, doc.text);
+                                if (foundOtp) break;
+                            }
+                        }
+                        callback(null, foundOtp);
+                    } catch(e) {
+                        callback(e, null);
+                    }
+                },
+                onerror: function(err) { callback(err, null); }
+            });
+        } else {
+            const listUrl = `https://inboxes.com/api/v2/inbox/${encodeURIComponent(email)}?_t=${Date.now()}`;
+            GM_xmlhttpRequest({
+                method: "GET",
+                url: listUrl,
+                headers: {
+                    "Accept": "application/json, text/plain, */*",
+                    "User-Agent": navigator.userAgent
+                },
+                onload: function(res) {
+                    try {
+                        const data = JSON.parse(res.responseText);
+                        const messages = data.msgs || [];
+                        let targetMsg = messages.find(msg => msg.f && msg.f.toLowerCase().includes('microsoft'));
+
+                        if (targetMsg) {
+                            const bodyUrl = `https://inboxes.com/api/v2/message/${encodeURIComponent(targetMsg.uid)}`;
+                            GM_xmlhttpRequest({
+                                method: "GET",
+                                url: bodyUrl,
+                                headers: {
+                                    "Accept": "application/json, text/plain, */*",
+                                    "User-Agent": navigator.userAgent
+                                },
+                                onload: function(bodyRes) {
+                                    try {
+                                        const bodyData = JSON.parse(bodyRes.responseText);
+                                        const foundOtp = extractOtpFromHtml(bodyData.html, bodyData.text);
+                                        callback(null, foundOtp);
+                                    } catch(e) {
+                                        callback(e, null);
+                                    }
+                                },
+                                onerror: function(err) { callback(err, null); }
+                            });
+                        } else {
+                            callback(null, null);
+                        }
+                    } catch(e) {
+                        callback(e, null);
+                    }
+                },
+                onerror: function(err) { callback(err, null); }
+            });
+        }
+    }
+
+    let activeFlowId = 0;
+    let currentFlow = null;
+
+    async function handleLogin(flowId) {
+        setDebug(`[Đăng nhập] Đang xử lý đăng nhập cho: <b>${regData.email}</b>...`);
+        const old_recovery = regData.oldRecovery;
+        
+        while (flowId === activeFlowId) {
+            await wait(800);
+            if (flowId !== activeFlowId) return;
+
+            const passInputForSwitch = document.querySelector('input[type="password"], input[name="passwd"]');
+            const switchToPasswordLink = Array.from(document.querySelectorAll('a, button, input, [role="button"], [role="link"], #idA_PWD_SwitchToPassword')).find(el => {
+                const txt = (el.textContent || el.value || '').trim().toLowerCase();
+                return el.id === 'idA_PWD_SwitchToPassword' ||
+                       txt.includes('sử dụng mật khẩu') ||
+                       txt.includes('use your password') ||
+                       txt.includes('use a password') ||
+                       txt.includes('mật khẩu của bạn');
+            });
+            if (switchToPasswordLink && (!passInputForSwitch || passInputForSwitch.offsetWidth === 0)) {
+                setDebug(`🔗 Click [Sử dụng mật khẩu]...`, '#0284c7');
+                safeClick(switchToPasswordLink);
+                await wait(400);
+                continue;
+            }
+
+            const emailInput = document.querySelector('input[type="email"], input[name="loginfmt"]');
+            if (emailInput && emailInput.offsetWidth > 0) {
+                if (emailInput.value !== regData.email) {
+                    setDebug(`[Đăng nhập] Đang điền email: ${regData.email}...`);
+                    safeFill(emailInput, regData.email);
+                    await wait(200);
+                }
+                const nextBtn = document.querySelector('input[type="submit"], button[type="submit"], #idSIButton9, button#submitBtn');
+                if (nextBtn) {
+                    setDebug(`[Đăng nhập] Click Tiếp theo...`);
+                    safeClick(nextBtn);
+                }
+                continue;
+            }
+ 
+            const passwordInput = document.querySelector('input[type="password"], input[name="passwd"]');
+            if (passwordInput && passwordInput.offsetWidth > 0) {
+                if (passwordInput.value !== regData.pass) {
+                    setDebug(`[Đăng nhập] Đang điền mật khẩu...`);
+                    safeFill(passwordInput, regData.pass);
+                    await wait(200);
+                }
+                const signInBtn = document.querySelector('input[type="submit"], button[type="submit"], #idSIButton9, button#submitBtn');
+                if (signInBtn) {
+                    setDebug(`[Đăng nhập] Click Đăng nhập...`);
+                    safeClick(signInBtn);
+                }
+                continue;
+            }
+
+            const emailConfirmInput = document.querySelector('input[name="proof"], input#i0027, input#otcEmail, input#emailTxt');
+            if (emailConfirmInput && emailConfirmInput.offsetWidth > 0 && old_recovery) {
+                if (emailConfirmInput.value !== old_recovery) {
+                    setDebug(`📬 [Bảo mật] Điền xác nhận Mail khôi phục: ${old_recovery}`);
+                    safeFill(emailConfirmInput, old_recovery);
+                    await wait(200);
+                }
+                const sendCodeBtn = Array.from(document.querySelectorAll('input[type="submit"], input[type="button"], button')).find(el => {
+                    const txt = (el.textContent || el.value || '').trim().toLowerCase();
+                    return txt === 'gửi mã' || txt === 'send code' || txt.includes('gửi mã') || txt.includes('send code');
+                });
+                if (sendCodeBtn) {
+                    setDebug(`🖱️ Click gửi mã OTP về mail khôi phục...`);
+                    safeClick(sendCodeBtn);
+                    await wait(500);
+                }
+                continue;
+            }
+
+            if (old_recovery) {
+                const prefix = old_recovery.substring(0, 2);
+                const sendCodeTile = Array.from(document.querySelectorAll('.tile-layout, .tile, [role="button"], a')).find(el => {
+                    const txt = (el.textContent || '').toLowerCase();
+                    return txt.includes('gửi mã đến') || txt.includes('send code to') || txt.includes(prefix);
+                });
+                if (sendCodeTile && sendCodeTile.offsetWidth > 0) {
+                    setDebug(`📬 [Bảo mật] Đang chọn gửi mã đến Mail khôi phục: ${old_recovery}...`);
+                    safeClick(sendCodeTile);
+                    await wait(500);
+                    continue;
+                }
+            }
+
+            const singleOtpInput = document.querySelector('input[name="otc"], input#idTxtBx_SAOTCC_OTC, input#otcTextBox, input[name="code"], input[name="verificationCode"], input#VerificationCode');
+            if (singleOtpInput && singleOtpInput.offsetWidth > 0 && old_recovery) {
+                setDebug(`⏳ [Bảo mật] Đang cào OTP từ email khôi phục: ${old_recovery}...`, '#d97706');
+                
+                const otp = await new Promise(resolve => {
+                    fetchOtpFromInboxesOrSmv(old_recovery, (err, code) => {
+                        resolve(code);
+                    });
+                });
+
+                if (otp) {
+                    if (flowId !== activeFlowId) return;
+                    setDebug(`🔐 Đã tự động lấy OTP: ${otp}. Đang điền...`, '#16a34a');
+                    safeFill(singleOtpInput, otp);
+                    await wait(1000);
+                    const verifyBtn = document.querySelector('input[type="submit"], button[type="submit"], #idSIButton9, #submitBtn');
+                    if (verifyBtn) {
+                        safeClick(verifyBtn);
+                        await wait(3000);
+                    }
+                } else {
+                    setDebug(`⏳ Đang chờ thư OTP từ Microsoft gửi về ${old_recovery}...`);
+                }
+                continue;
+            }
+
+            if (document.body.innerText.includes('Stay signed in?') || document.body.innerText.includes('Duy trì đăng nhập?')) {
+                setDebug(`[Đăng nhập] Đang bỏ qua màn hình duy trì đăng nhập...`);
+                safeClick(document.querySelector('#idBtn_Back') || document.querySelector('#idSIButton9')); 
+                continue;
+            }
+
+            const skipBtn = document.querySelector('#iCancel');
+            if (skipBtn && skipBtn.offsetWidth > 0) {
+                setDebug(`[Đăng nhập] Đang bỏ qua màn hình chào mừng...`);
+                safeClick(skipBtn);
+                continue;
+            }
+        }
+    }
+
+    async function handleOutlookInbox(flowId) {
+        setDebug('[Inbox Outlook] Đang tải hộp thư...');
+        let retries = 0;
+        while (retries < 25 && flowId === activeFlowId) {
+            await wait(2000);
+            if (flowId !== activeFlowId) return;
+             const messages = Array.from(document.querySelectorAll('[role="option"], [data-convid], [data-item-id], tr, [class*="customRow"], [class*="MessageCard"]')).filter(el => {
+                 const txt = el.textContent || '';
+                 const lower = txt.toLowerCase();
+                 const hasCapital = (lower.includes('capital') && lower.includes('one')) || lower.includes('capitaloneshopping');
+                 const hasKeywords = lower.includes('reset') || lower.includes('password') || lower.includes('mật khẩu') || lower.includes('khôi phục') || lower.includes('token') || lower.includes('accounts.capitaloneshopping.com');
+                 return hasCapital && hasKeywords;
+             });
+              
+             if (messages.length > 0) {
+                 setDebug(`[Inbox Outlook] Đã tìm thấy thư Capital One. Đang click chọn thư...`);
+                 const firstMsg = messages[0];
+                 safeClick(firstMsg);
+                 
+                 // Dự phòng: Click thêm vào toàn bộ thẻ con quan trọng (tiêu đề, người gửi...) của hàng thư để đảm bảo React mở thư
+                 const childrenToClick = Array.from(firstMsg.querySelectorAll('span, div, a, [class*="subject"], [class*="sender"], [class*="Subject"], [class*="Sender"]')).filter(child => {
+                     const t = (child.textContent || '').trim().toLowerCase();
+                     return t.includes('capital') || t.includes('reset') || t.includes('password') || t.includes('mật khẩu') || t.includes('khôi phục') || t.includes('token');
+                 });
+                 for (const child of childrenToClick) {
+                     safeClick(child);
+                 }
+                 
+                 await wait(3500);
+                 if (flowId !== activeFlowId) return;
+                
+                 // Hàm helper trích xuất link reset từ các thuộc tính của thẻ <a> (title, text, href)
+                 function extractResetUrlFromElement(a) {
+                     const candidates = [
+                         a.getAttribute('title') || '',
+                         a.textContent || '',
+                         a.href || ''
+                     ];
+                     for (const cand of candidates) {
+                         if (cand.includes('capitaloneshopping.com') && cand.includes('token=')) {
+                             const txt = document.createElement('textarea');
+                             txt.innerHTML = cand.trim();
+                             return txt.value;
+                         }
+                     }
+                     return null;
+                 }
+
+                 const allATags = [];
+                 const allHtmls = [];
+                 
+                 // Hàm đệ quy quét DOM xuyên qua Shadow DOM
+                 function scanNode(node) {
+                     if (!node) return;
+                     
+                     if (node.innerHTML) {
+                         allHtmls.push(node.innerHTML);
+                     }
+                     
+                     if (node.tagName === 'A') {
+                         allATags.push(node);
+                     }
+                     
+                     if (node.querySelectorAll) {
+                         try {
+                             Array.from(node.querySelectorAll('a')).forEach(a => allATags.push(a));
+                         } catch (e) {}
+                     }
+                     
+                     if (node.shadowRoot) {
+                         try {
+                             scanNode(node.shadowRoot);
+                         } catch (e) {}
+                     }
+                     
+                     if (node.childNodes) {
+                         try {
+                             node.childNodes.forEach(child => scanNode(child));
+                         } catch (e) {}
+                     }
+                 }
+
+                 // Quét toàn bộ document chính
+                 scanNode(document);
+                 
+                 // Quét tất cả iframes
+                 const iframes = document.querySelectorAll('iframe');
+                 iframes.forEach(iframe => {
+                     try {
+                         const doc = iframe.contentDocument || iframe.contentWindow.document;
+                         if (doc) {
+                             scanNode(doc);
+                         }
+                     } catch (e) {}
+                 });
+
+                 let resetLinkUrl = null;
+                 // Tìm qua các thuộc tính của thẻ <a> trước
+                 for (const a of allATags) {
+                     const url = extractResetUrlFromElement(a);
+                     if (url) {
+                         resetLinkUrl = url;
+                         break;
+                     }
+                 }
+                 
+                 // Nếu vẫn chưa thấy, quét Regex dự phòng trên toàn bộ mã nguồn HTML thu thập được
+                 if (!resetLinkUrl) {
+                     for (const html of allHtmls) {
+                         const match = html.match(/https:\/\/[^\s"'>]*capitaloneshopping\.com\/[^\s"'>]*token=[^\s"'>]+/i);
+                         if (match) {
+                             const txt = document.createElement('textarea');
+                             txt.innerHTML = match[0];
+                             resetLinkUrl = txt.value;
+                             break;
+                         }
+                     }
+                 }
+                
+                if (resetLinkUrl) {
+                      setDebug('🎉 Đã tìm thấy Link reset password! Đang gửi về Tool...', '#16a34a');
+                      const emailToSend = regData ? regData.email : '';
+                      const targetLink = resetLinkUrl;
+                      const ports = [3000, 3001];
+                      ports.forEach(port => {
+                          GM_xmlhttpRequest({
+                              method: 'POST',
+                              url: `http://127.0.0.1:${port}/api/capital-reg-status`,
+                              headers: { 'Content-Type': 'application/json' },
+                              data: JSON.stringify({
+                                  email: emailToSend,
+                                  status: 'reset_link_found',
+                                  resetLink: targetLink
+                              }),
+                              onload: function(res) {
+                                  setDebug('🎉 Đã gửi link reset về Tool thành công!', '#16a34a');
+                              }
+                          });
+                      });
+                     
+                     await wait(2000);
+                     const currentHash = window.location.hash || '';
+                     const extraHash = currentHash.includes('#capitalReg=') ? `#capitalReg=${currentHash.split('#capitalReg=')[1]}` : '';
+                     window.location.href = resetLinkUrl + extraHash;
+                     return;
+                 }
+            }
+            retries++;
+        }
+        if (flowId === activeFlowId) {
+            setDebug('[Lỗi] Không tìm thấy email reset!', '#be123c');
+            pushStatus('error', 'Không tìm thấy link reset trong Outlook');
+        }
+    }
+
+    function run() {
+        initDebug();
+        regData = getRegData();
+        if (regData && regData.isAutoReg) {
+            startUrlMonitoring();
+        } else {
+            setDebug('⏳ Đang đồng bộ tài khoản hoạt động từ Tool...', '#0284c7');
+            let attempt = 0;
+            const maxAttempts = 6;
+
+            function tryGetActiveReg(port) {
+                GM_xmlhttpRequest({
+                    method: 'GET',
+                    url: `http://127.0.0.1:${port}/api/active-reg-data`,
+                    onload: function(res) {
+                        try {
+                            const json = JSON.parse(res.responseText);
+                            if (json.success && json.data) {
+                                regData = json.data;
+                                setDebug(`🎉 Đồng bộ OK! Đang xử lý: <b>${regData.email}</b>`, '#16a34a');
+                                startUrlMonitoring();
+                            } else {
+                                handleRetry(port);
+                            }
+                        } catch (e) {
+                            handleRetry(port);
+                        }
+                    },
+                    onerror: function(err) {
+                        handleRetry(port);
+                    }
+                });
+            }
+
+            function handleRetry(port) {
+                attempt++;
+                if (attempt < maxAttempts) {
+                    setDebug(`⏳ Đang đồng bộ tài khoản từ Tool (Lần thử ${attempt}/${maxAttempts})...`, '#0284c7');
+                    setTimeout(() => {
+                        tryGetActiveReg(port);
+                    }, 1500);
+                } else {
+                    if (port === 3001) {
+                        attempt = 0;
+                        tryGetActiveReg(3000);
+                    } else {
+                        setDebug('⚠️ Không có tài khoản hoạt động. Vui lòng click [Mở Mail] từ giao diện Tool!', '#d97706');
+                    }
+                }
+            }
+
+            tryGetActiveReg(3001);
+        }
+    }
+
+    function startUrlMonitoring() {
+        setInterval(() => {
+            const url = window.location.href;
+            let targetFlow = null;
+            if (url.includes('login.live.com') || url.includes('login.microsoftonline.com')) {
+                targetFlow = 'login';
+            } else if (url.includes('outlook.live.com')) {
+                targetFlow = 'outlook';
+            }
+
+            if (targetFlow && targetFlow !== currentFlow) {
+                currentFlow = targetFlow;
+                activeFlowId++;
+                const myFlowId = activeFlowId;
+                
+                if (targetFlow === 'login') {
+                    handleLogin(myFlowId);
+                } else if (targetFlow === 'outlook') {
+                    handleOutlookInbox(myFlowId);
+                }
+            }
+        }, 1500);
+    }
+
+    function pushStatus(status, errorMsg = '') {
+        if (!regData) return;
+        const ports = [3000, 3001];
+        ports.forEach(port => {
+            GM_xmlhttpRequest({
+                method: 'POST',
+                url: `http://127.0.0.1:${port}/api/capital-reg-status`,
+                headers: { 'Content-Type': 'application/json' },
+                data: JSON.stringify({
+                    email: regData.email,
+                    status: status,
+                    mkCapital: '',
+                    errorMsg: errorMsg
+                })
+            });
+        });
+    }
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        run();
+    } else {
+        window.addEventListener('DOMContentLoaded', run);
+    }
+})();

@@ -75,6 +75,36 @@ function extractLatestOtpFromHtml(html: string): string | null {
   return newestOtp;
 }
 
+const firstNames = ["James", "John", "Robert", "Michael", "William", "David", "Richard", "Charles", "Joseph", "Thomas", "Christopher", "Daniel", "Paul", "Mark", "Donald", "George", "Kenneth", "Steven", "Edward", "Brian", "Ronald", "Anthony", "Kevin", "Jason", "Matthew", "Gary", "Timothy", "Jose", "Larry", "Jeffrey", "Frank", "Scott", "Eric", "Stephen", "Andrew", "Raymond", "Gregory", "Joshua", "Jerry", "Dennis", "Walter", "Patrick", "Peter", "Harold", "Douglas", "Henry", "Carl", "Arthur", "Ryan", "Roger", "Joe", "Juan", "Jack", "Albert", "Jonathan", "Justin", "Terry", "Gerald", "Keith", "Samuel", "Ralph", "Lawrence", "Nicholas", "Roy", "Benjamin", "Bruce", "Brandon", "Adam", "Harry", "Fred", "Wayne", "Billy", "Steve", "Louis", "Jeremy", "Aaron", "Randy", "Howard", "Eugene", "Carlos", "Russell", "Bobby", "Victor", "Martin", "Ernest", "Phillip", "Todd", "Jesse", "Craig", "Alan", "Shawn", "Clarence", "Sean", "Philip", "Chris", "Johnny", "Earl", "Jimmy", "Antonio", "Danny", "Bryan", "Tony", "Luis", "Mike", "Stanley", "Leonard", "Nathan", "Dale", "Manuel", "Rodney", "Curtis", "Norman", "Allen", "Marvin", "Vincent", "Glenn", "Jeffery", "Travis", "Jeff", "Chad", "Jacob", "Lee", "Melvin", "Alfred", "Bradley", "Francis", "Stephen", "Mary", "Patricia", "Linda", "Barbara", "Elizabeth", "Jennifer", "Maria", "Susan", "Margaret", "Dorothy", "Lisa", "Nancy", "Karen", "Betty", "Helen", "Sandra", "Donna", "Carol", "Ruth", "Sharon", "Michelle", "Laura", "Sarah", "Kimberly", "Deborah", "Jessica", "Shirley", "Cynthia", "Angela", "Melissa", "Brenda", "Amy", "Anna", "Rebecca", "Virginia", "Kathleen", "Pamela", "Martha", "Debra", "Amanda", "Stephanie", "Carolyn", "Christine", "Marie", "Janet", "Catherine", "Frances", "Ann", "Joyce", "Diane", "Alice", "Julie", "Heather", "Teresa", "Doris", "Gloria", "Evelyn", "Jean", "Cheryl", "Mildred", "Katherine", "Joan", "Ashley", "Judith", "Rose", "Janice", "Kelly", "Nicole", "Judy", "Christina", "Kathy", "Theresa", "Beverly", "Denise", "Tammy", "Irene", "Jane", "Lori", "Rachel", "Marilyn", "Andrea", "Kathryn", "Louise", "Sara", "Anne", "Jacqueline", "Wanda", "Bonnie", "Julia", "Ruby", "Lois", "Tina", "Phyllis", "Norma", "Paula", "Diana", "Annie", "Lillian", "Emily", "Robin", "Peggy", "Crystal", "Gladys", "Rita", "Dawn", "Connie", "Florence", "Tracy", "Edna", "Tiffany", "Carmen", "Rosa", "Cindy", "Grace", "Wendy", "Victoria", "Edith", "Kim", "Sherry", "Sylvia", "Josephine", "Thelma", "Shannon", "Sheila", "Ethel", "Ellen", "Elaine", "Marjorie", "Carrie", "Charlotte", "Monica", "Esther", "Pauline", "Emma", "Juanita", "Anita", "Rhonda", "Hazel", "Amber", "Eva", "Debbie", "April", "Leslie", "Clara", "Lucille", "Jamie", "Joanne", "Eleanor", "Valerie", "Danielle", "Megan", "Alicia", "Suzanne", "Michele", "Gail", "Bertha", "Darlene", "Veronica", "Jill", "Erin", "Geraldine", "Lauren", "Cathy", "Joann", "Lorraine", "Lynn", "Sally", "Regina", "Erica", "Beatrice", "Dolores", "Bernice", "Audrey", "Yvonne", "Annette", "June", "Samantha", "Marion", "Dana", "Stacy", "Ana", "Renee", "Ida", "Vivian", "Roberta", "Holly", "Brittany", "Melanie", "Loretta", "Yolanda", "Jeanette", "Laurie", "Katie", "Kristen", "Vanessa", "Alma", "Sue", "Elsie", "Beth", "Jeanne"];
+const lastNames = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin", "Lee", "Perez", "Thompson", "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson", "Walker", "Young", "Allen", "King", "Wright", "Scott", "Torres", "Nguyen", "Hill", "Flores", "Green", "Adams", "Nelson", "Baker", "Hall", "Rivera", "Campbell", "Mitchell", "Carter", "Roberts", "Gomez", "Phillips", "Evans", "Turner", "Diaz", "Parker", "Cruz", "Edwards", "Collins", "Reyes", "Stewart", "Morris", "Morales", "Murphy", "Cook", "Rogers", "Gutierrez", "Ortiz", "Morgan", "Cooper", "Peterson", "Bailey", "Reed", "Kelly", "Howard", "Ramos", "Kim", "Cox", "Ward", "Richardson", "Watson", "Brooks", "Chavez", "Wood", "James", "Bennett", "Gray", "Mendoza", "Ruiz", "Hughes", "Price", "Alvarez", "Castillo", "Sanders", "Patel", "Myers", "Long", "Ross", "Foster", "Jimenez"];
+
+function getRandomUSName(existingRows: any[] = []) {
+  let first = '';
+  let last = '';
+  let retries = 0;
+  while (retries < 200) {
+    first = firstNames[Math.floor(Math.random() * firstNames.length)];
+    last = lastNames[Math.floor(Math.random() * lastNames.length)];
+    const isDup = existingRows.some(
+      r => (r.firstName || '').toLowerCase() === first.toLowerCase() && 
+           (r.lastName || '').toLowerCase() === last.toLowerCase()
+    );
+    if (!isDup) {
+      return { first, last };
+    }
+    retries++;
+  }
+  // Nếu thử 200 lần vẫn trùng (rất hiếm), thêm chữ lót viết tắt ngẫu nhiên làm hậu tố để đảm bảo duy nhất
+  const middleInitials = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const middle = middleInitials[Math.floor(Math.random() * middleInitials.length)];
+  return { first: `${first} ${middle}.`, last };
+}
+
+function getRandomUSZip() {
+  const zips = ["10001", "90001", "33101", "60601", "77001", "19101", "85001", "92101", "75201", "95101", "78701", "32201", "94101", "43201", "46201", "76101", "28201", "98101", "80201", "20001"];
+  return zips[Math.floor(Math.random() * zips.length)];
+}
+
 function triggerTampermonkeyScrape(email: string): Promise<string | null> {
   return new Promise((resolve) => {
     const handler = (e: any) => {
@@ -103,9 +133,11 @@ type Props = {
   fviaToken?: string;
   preferredDomain?: string;
   mailProvider: 'fvia' | 'inboxes';
-  mode?: 'default' | 'capital';
+  mode?: 'default' | 'capital' | 'capital_reg';
   activeEmail?: string;
   onActive?: (email: string) => void;
+  runDirectly?: boolean;
+  allRows?: SheetRow[];
 };
 
 function CopyField({ label, value, color = 'blue', noMargin = false }: { label: string; value: string; color?: 'blue' | 'green' | 'purple' | 'gray'; noMargin?: boolean }) {
@@ -139,7 +171,14 @@ function CopyField({ label, value, color = 'blue', noMargin = false }: { label: 
   );
 }
 
-export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, preferredDomain, mailProvider, mode = 'default', activeEmail, onActive }: Props) {
+function generateMkCapitalPreview(pass: string): string {
+  if (!pass) return '';
+  let newPass = pass + "A!";
+  // Replace consecutive duplicate characters with a single one (e.g. 11 -> 1, aa -> a)
+  return newPass.replace(/(.)\1+/g, "$1");
+}
+
+export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, preferredDomain, mailProvider, mode = 'default', activeEmail, onActive, runDirectly, allRows = [] }: Props) {
   const [isCreatingMail, setIsCreatingMail] = useState(false);
   const [generated, setGenerated] = useState<string>(row.recovery);
   const [createdAt, setCreatedAt] = useState<number | null>(null);
@@ -157,6 +196,48 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
   const [checkingCapital, setCheckingCapital] = useState(false);
   const [checkCapitalResult, setCheckCapitalResult] = useState<'idle' | 'checking' | 'ok' | 'error' | 'cf_block'>('idle');
   const [checkCapitalError, setCheckCapitalError] = useState('');
+
+  async function ensureUSInfoPopulated() {
+    let currentFirst = row.firstName;
+    let currentLast = row.lastName;
+    let currentZip = row.zipCode;
+
+    if (!currentFirst || !currentLast || !currentZip) {
+      const name = getRandomUSName(allRows);
+      const zip = getRandomUSZip();
+      currentFirst = name.first;
+      currentLast = name.last;
+      currentZip = zip;
+
+      try {
+        const res = await fetch('/api/update-sheet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sheetId,
+            rowIndex: row.rowIndex,
+            firstName: currentFirst,
+            lastName: currentLast,
+            zipCode: currentZip
+          })
+        });
+        if (res.ok) {
+          onUpdated(row.rowIndex, {
+            firstName: currentFirst,
+            lastName: currentLast,
+            zipCode: currentZip
+          });
+        }
+      } catch (e) {
+        console.error('Lỗi tự động sinh và lưu Tên & Zip:', e);
+      }
+    }
+    return {
+      firstName: currentFirst,
+      lastName: currentLast,
+      zipCode: currentZip
+    };
+  }
 
   useEffect(() => {
     const capitalStr = typeof row.newMkCapital === 'string' ? row.newMkCapital.toUpperCase() : '';
@@ -291,6 +372,33 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
   };
 
   const isDone = row.isDone;
+
+  const [serverStatus, setServerStatus] = useState<string>('');
+  const [serverResetLink, setServerResetLink] = useState<string>('');
+
+  useEffect(() => {
+    if (row.isDone) return;
+    
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/capital-reg-status?email=${encodeURIComponent(row.email)}&_t=${Date.now()}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.hasResult) {
+            setServerStatus(data.result.status);
+            if (data.result.resetLink) {
+              setServerResetLink(data.result.resetLink);
+            }
+            if (data.result.status === 'ok') {
+              onUpdated(row.rowIndex, { isDone: true, mkCapital: data.result.mkCapital });
+            }
+          }
+        }
+      } catch (e) {}
+    }, 4000);
+    
+    return () => clearInterval(interval);
+  }, [row.isDone, row.email, row.rowIndex, onUpdated]);
 
   const pollingRef = useRef(false);
   const latestTokenRef = useRef(fviaToken);
@@ -726,7 +834,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
       </div>
 
       <div className="mb-3">
-        <CopyField label="📧 Email Hotmail" value={row.email} color="blue" />
+        <CopyField label={mode === 'capital_reg' ? "📧 Mail" : "📧 Email Hotmail"} value={row.email} color="blue" />
         <div className="flex gap-2">
           <button
             onClick={async () => {
@@ -872,7 +980,9 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
       </div>
       
       {/* Hiển thị mật khẩu cũ khi chưa làm, hoặc mật khẩu mới khi đã làm */}
-      {!isDone ? (
+      {mode === 'capital_reg' ? (
+        <CopyField label="🔑 Mk mail" value={row.password} color="gray" />
+      ) : !isDone ? (
         <CopyField label="🔑 Mật khẩu Hotmail (cũ)" value={row.password} color="gray" />
       ) : (
         mode === 'capital' && row.newPassword && (
@@ -964,7 +1074,399 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
 
       <div className="border-t border-dashed border-gray-300 my-3" />
 
-      {generated ? (
+      {mode === 'capital_reg' ? (
+        <>
+          {/* 1. Hiển thị mail khôi phục có sẵn */}
+          {row.recovery && (
+            <CopyField label="📬 Mail khôi phục" value={row.recovery} color="blue" />
+          )}
+
+           {/* Hiển thị & Sinh thông tin Tên/Zip Mỹ */}
+           <div className="mt-2 text-xs p-2.5 rounded border border-indigo-100 bg-indigo-50/30 mb-2">
+             <div className="flex justify-between items-center mb-1.5">
+               <span className="font-bold text-indigo-800">🇺🇸 Thông tin đăng ký Mỹ:</span>
+               {!row.isDone && (
+                 <button
+                   onClick={async () => {
+                     const randomName = getRandomUSName(allRows);
+                     const randomZip = getRandomUSZip();
+                     try {
+                       const res = await fetch('/api/update-sheet', {
+                         method: 'POST',
+                         headers: { 'Content-Type': 'application/json' },
+                         body: JSON.stringify({
+                           sheetId,
+                           rowIndex: row.rowIndex,
+                           firstName: randomName.first,
+                           lastName: randomName.last,
+                           zipCode: randomZip
+                         })
+                       });
+                       if (res.ok) {
+                         onUpdated(row.rowIndex, {
+                           firstName: randomName.first,
+                           lastName: randomName.last,
+                           zipCode: randomZip
+                         });
+                       } else {
+                         alert('Lỗi lưu thông tin lên Google Sheet!');
+                       }
+                     } catch (e) {
+                       alert('Lỗi kết nối API lưu thông tin!');
+                     }
+                   }}
+                   type="button"
+                   className="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] rounded font-bold transition-colors"
+                 >
+                   🎲 Sinh Tên & Zip
+                 </button>
+               )}
+             </div>
+             <div className="grid grid-cols-3 gap-2 font-mono text-[11px] text-gray-700">
+                <div 
+                  onClick={() => row.firstName && navigator.clipboard.writeText(row.firstName)}
+                  className="bg-white p-1 rounded border cursor-pointer hover:bg-indigo-50/50 transition-colors"
+                  title="Click để copy First Name"
+                >
+                  <span className="text-[9px] text-gray-400 block font-sans">First Name 📋</span>
+                  <span className="font-bold text-indigo-700 break-all select-all">{row.firstName || '—'}</span>
+                </div>
+                <div 
+                  onClick={() => row.lastName && navigator.clipboard.writeText(row.lastName)}
+                  className="bg-white p-1 rounded border cursor-pointer hover:bg-indigo-50/50 transition-colors"
+                  title="Click để copy Last Name"
+                >
+                  <span className="text-[9px] text-gray-400 block font-sans">Last Name 📋</span>
+                  <span className="font-bold text-indigo-700 break-all select-all">{row.lastName || '—'}</span>
+                </div>
+                <div 
+                  onClick={() => row.zipCode && navigator.clipboard.writeText(row.zipCode)}
+                  className="bg-white p-1 rounded border cursor-pointer hover:bg-indigo-50/50 transition-colors"
+                  title="Click để copy Zip Code"
+                >
+                  <span className="text-[9px] text-gray-400 block font-sans">Zip Code 📋</span>
+                  <span className="font-bold text-indigo-700 break-all select-all">{row.zipCode || '—'}</span>
+                </div>
+              </div>
+           </div>
+
+          {/* 2. Hiển thị dự kiến Mk Capital */}
+          <div className="mt-2 text-xs text-gray-600 bg-gray-50 p-2.5 rounded border border-dashed border-gray-300 mb-3">
+            <div className="flex justify-between items-center gap-2">
+              <div className="truncate">
+                🔑 <b>Dự kiến Mk Capital:</b>{' '}
+                <span 
+                  className="font-mono text-indigo-600 select-all cursor-pointer font-bold bg-white px-1.5 py-0.5 rounded border shadow-sm hover:text-indigo-800 transition-colors" 
+                  title="Click để copy" 
+                  onClick={() => navigator.clipboard.writeText(generateMkCapitalPreview(row.password))}
+                >
+                  {generateMkCapitalPreview(row.password) || '—'}
+                </span>
+              </div>
+              
+              {!row.isDone && (
+                <button
+                  onClick={async () => {
+                    setLoadingMarkError(true);
+                    try {
+                      const expectedPass = generateMkCapitalPreview(row.password);
+                      const res = await fetch('/api/complete-row', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          sheetId,
+                          sheetName,
+                          rowIndex: row.rowIndex,
+                          newMkCapital: expectedPass,
+                          mode: 'capital_reg'
+                        })
+                      });
+                      const data = await res.json();
+                      if (!data.success) throw new Error(data.error || 'Lỗi lưu vào sheet');
+                      
+                      onUpdated(row.rowIndex, { 
+                        isDone: true, 
+                        mkCapital: expectedPass 
+                      });
+                      alert(`Đã lưu mật khẩu ${expectedPass} và ngày hôm nay vào Sheet!`);
+                    } catch (e: any) {
+                      alert('Lỗi khi lưu: ' + (e.message || String(e)));
+                    } finally {
+                      setLoadingMarkError(false);
+                    }
+                  }}
+                  disabled={loadingMarkError}
+                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded shadow-sm text-[11px] flex items-center gap-1 transition-colors flex-shrink-0"
+                >
+                  💾 Lưu
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 3. Hiển thị mật khẩu Capital đã tạo (nếu có) */}
+          {row.mkCapital && (
+            <CopyField label="💳 Mk capital" value={row.mkCapital} color="green" />
+          )}
+
+          {/* 4. Nút bấm Tạo cho riêng tài khoản này */}
+          {!row.isDone && (
+            <div className="flex gap-2 mt-2 w-full">
+              <button
+                onClick={async () => {
+                  setErr('');
+                  setLoadingComplete(true);
+                  try {
+                    const info = await ensureUSInfoPopulated();
+                    const accData = {
+                        sheetId,
+                        sheetName,
+                        rowIndex: row.rowIndex,
+                        email: row.email,
+                        pass: row.password,
+                        code: row.code,
+                        recovery: row.recovery,
+                        oldRecovery: row.oldRecovery,
+                        firstName: info.firstName,
+                        lastName: info.lastName,
+                        zipCode: info.zipCode,
+                        isAutoReg: true
+                      };
+                      const jsonStr = JSON.stringify(accData);
+                      const base64Data = btoa(unescape(encodeURIComponent(jsonStr)));
+                      const checkUrl = `https://capitaloneshopping.com/onboarding/base#capitalReg=${base64Data}`;
+                      const oauthUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=9199bf20-a13f-4107-85dc-02114787ef48&scope=https%3A%2F%2Foutlook.office.com%2F.default%20openid%20profile%20offline_access&redirect_uri=https%3A%2F%2Foutlook.live.com%2Fmail%2F&client-request-id=ccdd58c9-ae4b-3c55-0ffa-c890dfa17330&response_mode=fragment&client_info=1&clidata=1&prompt=select_account&nonce=019f4231-f4ad-74cb-8f28-7ffa09210948&state=eyJpZCI6IjAxOWY0MjMxLWY0YWQtNzY1YS1hYjViLThiMDJiNGY1ZDAwZCIsIm1ldGEiOnsiaW50ZXJhY3Rpb25UeXBlIjoicmVkaXJlY3QifX0%3D%7CaHR0cHM6Ly9vdXRsb29rLmxpdmUuY29tL21haWwv&claims=%7B%22access_token%22%3A%7B%22xms_cc%22%3A%7B%22values%22%3A%5B%22CP1%22%5D%7D%7D%7D&x-client-SKU=msal.js.browser&x-client-VER=5.12.0&response_type=code&code_challenge=ODz59kCxQQ4SOagHJIdLUBvPIKLbvUc-t70OHFFwS-w&code_challenge_method=S256&cobrandid=ab0455a0-8d03-46b9-b18b-df2f57b9e44c&fl=dob%2Cflname%2Cwld#capitalReg=${base64Data}`;
+                      
+                      // Chỉ cần mở 1 tab Capital, tab Hotmail sẽ được SCRIPT 8 tự mở ngầm qua Tampermonkey
+                      const win = window.open(checkUrl, '_blank');
+                      if (!win) {
+                        throw new Error('Trình duyệt chặn mở Tab mới (Popup Blocker)! Vui lòng cho phép popup rồi thử lại.');
+                      }
+                    
+                    // Bắt đầu polling tìm kết quả cho riêng tài khoản này
+                    const startTime = Date.now();
+                    const maxWaitTime = 180 * 1000;
+                    while (Date.now() - startTime < maxWaitTime) {
+                      await new Promise(r => setTimeout(r, 3000));
+                      const statusRes = await fetch(`/api/capital-reg-status?email=${encodeURIComponent(row.email)}&_t=${Date.now()}`);
+                      if (statusRes.ok) {
+                        const statusData = await statusRes.json();
+                        if (statusData.success && statusData.hasResult) {
+                          const result = statusData.result;
+                          if (result.status === 'ok') {
+                            onUpdated(row.rowIndex, { isDone: true, mkCapital: result.mkCapital });
+                            alert(`Đăng ký thành công cho ${row.email}!`);
+                          } else {
+                            setErr(`Lỗi: ${result.errorMsg}`);
+                          }
+                          break;
+                        }
+                      }
+                    }
+                  } catch (e: any) {
+                    setErr(e.message || String(e));
+                  } finally {
+                    setLoadingComplete(false);
+                  }
+                }}
+                disabled={loadingComplete}
+                className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs h-[38px] flex items-center justify-center transition-colors animate-pulse"
+              >
+                {loadingComplete ? '⏳ Đang tạo...' : '🚀 Tạo Capital'}
+              </button>
+
+              <button
+                onClick={async () => {
+                  try {
+                    const info = await ensureUSInfoPopulated();
+                    const accData = {
+                      sheetId,
+                      sheetName,
+                      rowIndex: row.rowIndex,
+                      email: row.email,
+                      pass: row.password,
+                      code: row.code,
+                      recovery: row.recovery,
+                      oldRecovery: row.oldRecovery,
+                      firstName: info.firstName,
+                      lastName: info.lastName,
+                      zipCode: info.zipCode,
+                      isAutoReg: true
+                    };
+                    const jsonStr = JSON.stringify(accData);
+                    const base64Data = btoa(unescape(encodeURIComponent(jsonStr)));
+                    const checkUrl = `https://capitaloneshopping.com/onboarding/base#capitalReg=${base64Data}`;
+                    
+                    navigator.clipboard.writeText(checkUrl);
+                    alert('Đã copy Link đăng ký! Hãy dán (Paste & Go) vào trình duyệt AdsPower.');
+                  } catch (err) {
+                    alert('Lỗi copy link: ' + String(err));
+                  }
+                }}
+                type="button"
+                className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-bold text-xs h-[38px] flex items-center justify-center transition-colors whitespace-nowrap"
+                title="Copy Link đăng ký để dán vào AdsPower"
+              >
+                📋 Copy Link
+              </button>
+            </div>
+          )}
+
+          {/* Nút thao tác trên máy thật khi chạy chế độ capital_reg */}
+          {!row.isDone && (
+            <div className="flex flex-col gap-2 mt-2 w-full p-2.5 bg-indigo-50/50 rounded-lg border border-dashed border-indigo-200">
+              <div className="text-[11px] font-bold text-indigo-800 flex items-center gap-1">
+                💻 Thao tác liên kết máy thật:
+              </div>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    const info = await ensureUSInfoPopulated();
+                    const accData = {
+                      sheetId,
+                      sheetName,
+                      rowIndex: row.rowIndex,
+                      email: row.email,
+                      pass: row.password,
+                      code: row.code,
+                      recovery: row.recovery,
+                      oldRecovery: row.oldRecovery,
+                      firstName: info.firstName,
+                      lastName: info.lastName,
+                      zipCode: info.zipCode,
+                      isAutoReg: true
+                    };
+                    
+                    // Lưu lên active-reg-data của máy chủ và chờ hoàn tất
+                    try {
+                      await fetch('/api/active-reg-data', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(accData)
+                      });
+                    } catch (err) {
+                      console.error('Lỗi lưu active reg:', err);
+                    }
+
+                    const base64Data = btoa(unescape(encodeURIComponent(JSON.stringify(accData))));
+                    const oauthUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=9199bf20-a13f-4107-85dc-02114787ef48&scope=https%3A%2F%2Foutlook.office.com%2F.default%20openid%20profile%20offline_access&redirect_uri=https%3A%2F%2Foutlook.live.com%2Fmail%2F&client-request-id=ccdd58c9-ae4b-3c55-0ffa-c890dfa17330&response_mode=fragment&client_info=1&clidata=1&prompt=select_account&nonce=019f4231-f4ad-74cb-8f28-7ffa09210948&state=eyJpZCI6IjAxOWY0MjMxLWY0YWQtNzY1YS1hYjViLThiMDJiNGY1ZDAwZCIsIm1ldGEiOnsiaW50ZXJhY3Rpb25UeXBlIjoicmVkaXJlY3QifX0%3D%7CaHR0cHM6Ly9vdXRsb29rLmxpdmUuY29tL21haWwv&claims=%7B%22access_token%22%3A%7B%22xms_cc%22%3A%7B%22values%22%3A%5B%22CP1%22%5D%7D%7D%7D&x-client-SKU=msal.js.browser&x-client-VER=5.12.0&response_type=code&code_challenge=ODz59kCxQQ4SOagHJIdLUBvPIKLbvUc-t70OHFFwS-w&code_challenge_method=S256&cobrandid=ab0455a0-8d03-46b9-b18b-df2f57b9e44c&fl=dob%2Cflname%2Cwld#capitalReg=${base64Data}`;
+                    
+                    fetch('/api/open-incognito', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ url: oauthUrl })
+                    }).catch(err => {
+                      console.error('Lỗi gọi open-incognito:', err);
+                      window.open(oauthUrl, '_blank');
+                    });
+                  }}
+                  type="button"
+                  className="flex-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-[11px] transition-colors"
+                  title="Mở link đăng nhập Hotmail trên Chrome thường của máy chính"
+                >
+                  📬 Mở Mail (Máy thật)
+                </button>
+                
+                {(serverStatus === 'reset_link_found' || serverResetLink) && (
+                  <>
+                    <button
+                      onClick={async () => {
+                        setLoadingComplete(true);
+                        try {
+                          const info = await ensureUSInfoPopulated();
+                          const accData = {
+                            sheetId,
+                            sheetName,
+                            rowIndex: row.rowIndex,
+                            email: row.email,
+                            pass: row.password,
+                            code: row.code,
+                            recovery: row.recovery,
+                            oldRecovery: row.oldRecovery,
+                            firstName: info.firstName,
+                            lastName: info.lastName,
+                            zipCode: info.zipCode,
+                            isAutoReg: true
+                          };
+                          const base64Data = btoa(unescape(encodeURIComponent(JSON.stringify(accData))));
+                          const targetUrl = serverResetLink + `#capitalReg=${base64Data}`;
+                          const win = window.open(targetUrl, '_blank');
+                          if (!win) {
+                            throw new Error('Trình duyệt chặn mở Tab mới (Popup Blocker)! Vui lòng cho phép popup rồi thử lại.');
+                          }
+                        } catch (e: any) {
+                          alert('Lỗi: ' + String(e));
+                        } finally {
+                          setLoadingComplete(false);
+                        }
+                      }}
+                      disabled={loadingComplete}
+                      type="button"
+                      className="flex-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold text-[11px] transition-colors"
+                      title="Mở link reset mật khẩu trực tiếp trong AdsPower để đổi mật khẩu và zip/tên"
+                    >
+                      🔗 Tiếp tục (AdsPower)
+                    </button>
+                    
+                    <button
+                      onClick={async () => {
+                        const info = await ensureUSInfoPopulated();
+                        const accData = {
+                          sheetId,
+                          sheetName,
+                          rowIndex: row.rowIndex,
+                          email: row.email,
+                          pass: row.password,
+                          code: row.code,
+                          recovery: row.recovery,
+                          oldRecovery: row.oldRecovery,
+                          firstName: info.firstName,
+                          lastName: info.lastName,
+                          zipCode: info.zipCode,
+                          isAutoReg: true
+                        };
+                        const base64Data = btoa(unescape(encodeURIComponent(JSON.stringify(accData))));
+                        navigator.clipboard.writeText(serverResetLink + `#capitalReg=${base64Data}`);
+                        alert('Đã copy Link Reset! Hãy dán vào AdsPower.');
+                      }}
+                      type="button"
+                      className="px-2.5 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-bold text-[11px] transition-colors"
+                      title="Copy Link Reset để dán vào AdsPower thủ công"
+                    >
+                      📋 Copy Link Reset
+                    </button>
+                  </>
+                )}
+              </div>
+              
+              {serverResetLink && (() => {
+                const accData = {
+                  sheetId,
+                  sheetName,
+                  rowIndex: row.rowIndex,
+                  email: row.email,
+                  pass: row.password,
+                  code: row.code,
+                  recovery: row.recovery,
+                  oldRecovery: row.oldRecovery,
+                  firstName: row.firstName,
+                  lastName: row.lastName,
+                  zipCode: row.zipCode,
+                  isAutoReg: true
+                };
+                const base64Data = btoa(unescape(encodeURIComponent(JSON.stringify(accData))));
+                const fullLink = serverResetLink + `#capitalReg=${base64Data}`;
+                return (
+                  <div className="text-[10px] text-emerald-700 bg-emerald-50 p-1.5 rounded border border-emerald-100 break-all select-all font-mono">
+                    <b>Link Reset đầy đủ:</b> {fullLink}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </>
+      ) : generated ? (
         <>
           <CopyField label={mode === 'capital' ? "✨ Mail khôi phục mới" : "✨ Mail khôi phục đã tạo"} value={generated} color="green" />
           {otp && <CopyField label="🔐 Code (OTP Microsoft)" value={otp} color="purple" />}
@@ -999,9 +1501,24 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                     <input
                       type="checkbox"
                       checked={newPassword === 'SAI MẬT KHẨU MAIL'}
-                      onChange={(e) => {
-                        if (e.target.checked) setNewPassword('SAI MẬT KHẨU MAIL');
-                        else setNewPassword('');
+                      onChange={async (e) => {
+                        if (e.target.checked) {
+                          if (window.confirm('Xác nhận tài khoản này bị SAI MAIL và lưu/tô đỏ trên Sheet ngay lập tức?')) {
+                            setNewPassword('SAI MẬT KHẨU MAIL');
+                            try {
+                              await fetch('/api/mark-error', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ sheetId, sheetName, rowIndex: row.rowIndex, mode, errorType: 'mail', newMkCapital: newMkCapital || row.newMkCapital })
+                              });
+                              onUpdated(row.rowIndex, { isPasswordError: true, newPassword: 'SAI MẬT KHẨU MAIL' });
+                            } catch (error) {
+                              console.error('Lỗi khi lưu sai mail:', error);
+                            }
+                          }
+                        } else {
+                          setNewPassword('');
+                        }
                       }}
                     />
                     Sai Mail
@@ -1036,10 +1553,22 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                     <input
                       type="checkbox"
                       checked={isCapitalErrorUI}
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         if (e.target.checked) {
-                          setNewMkCapital('SAI MẬT KHẨU CAPITAL');
-                          onUpdated(row.rowIndex, { newMkCapital: 'SAI MẬT KHẨU CAPITAL' });
+                          if (window.confirm('Xác nhận lỗi Sai Capital và lưu lên Google Sheet ngay lập tức?')) {
+                            setNewMkCapital('SAI MẬT KHẨU CAPITAL');
+                            try {
+                              await fetch('/api/mark-error', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ sheetId, sheetName, rowIndex: row.rowIndex, mode, errorType: 'capital' })
+                              });
+                              // Bỏ isPasswordError: true để không nhảy dòng, chỉ hiện lỗi ở ô Capital
+                              onUpdated(row.rowIndex, { newMkCapital: 'SAI MẬT KHẨU CAPITAL' });
+                            } catch (error) {
+                              console.error('Lỗi khi lưu sai capital:', error);
+                            }
+                          }
                         } else {
                           setNewMkCapital('');
                           onUpdated(row.rowIndex, { newMkCapital: '' });

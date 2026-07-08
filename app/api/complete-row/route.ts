@@ -42,6 +42,31 @@ export async function POST(request: NextRequest) {
           values: [[email, newMkHotmail, recovery, newMkCapital]] 
         },
       });
+    } else if (mode === 'capital_reg') {
+      // 1. Tính toán ngày hiện tại định dạng DD/MM/YYYY theo giờ VN (GMT+7)
+      const now = new Date();
+      const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const vnTime = new Date(utc + (3600000 * 7));
+      const day = String(vnTime.getDate()).padStart(2, '0');
+      const month = String(vnTime.getMonth() + 1).padStart(2, '0');
+      const year = vnTime.getFullYear();
+      const dateStr = `${day}/${month}/${year}`;
+
+      // 2. Ghi Ngày tạo vào cột B (Cột B là cột 2, range: B${rowIndex})
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: `'${sheetName}'!B${rowIndex}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [[dateStr]] },
+      });
+
+      // 3. Ghi Mật khẩu Capital vào cột F (Cột F là cột 6, range: F${rowIndex})
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: `'${sheetName}'!F${rowIndex}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [[newMkCapital]] },
+      });
     } else {
       await sheets.spreadsheets.values.update({
         spreadsheetId: sheetId,

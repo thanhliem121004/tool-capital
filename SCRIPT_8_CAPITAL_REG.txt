@@ -1,0 +1,363 @@
+// ==UserScript==
+// @name         SCRIPT 8 - CAPITAL ONE REGISTRATION AUTO
+// @namespace    http://tampermonkey.net/
+// @version      1.0
+// @description  Tự động đăng ký Capital One, quên mật khẩu, lấy link từ API Khommo, đổi pass, cập nhật info.
+// @author       You
+// @match        *://capitaloneshopping.com/*
+// @grant        GM_xmlhttpRequest
+// @grant        GM_openInTab
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    let debugDiv = null;
+    function initDebug() {
+        if (debugDiv) return;
+        debugDiv = document.createElement('div');
+        debugDiv.style.position = 'fixed';
+        debugDiv.style.top = '10px';
+        debugDiv.style.right = '10px';
+        debugDiv.style.background = '#4c1d95';
+        debugDiv.style.color = 'white';
+        debugDiv.style.padding = '12px 16px';
+        debugDiv.style.borderRadius = '8px';
+        debugDiv.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';
+        debugDiv.style.zIndex = '9999999';
+        debugDiv.style.fontSize = '13px';
+        debugDiv.style.fontFamily = 'monospace';
+        debugDiv.style.lineHeight = '1.5';
+        debugDiv.style.maxWidth = '400px';
+        debugDiv.style.wordBreak = 'break-all';
+        debugDiv.innerHTML = '🚀 [Capital Reg] Khởi động script...';
+        document.body.appendChild(debugDiv);
+    }
+    function setDebug(msg, color = '#4c1d95') {
+        if (!debugDiv) initDebug();
+        debugDiv.style.background = color;
+        debugDiv.style.innerHTML = '🚀 [Capital Reg]<br>' + msg;
+    }
+
+    // 1. Đọc dữ liệu từ Hash
+    function getRegData() {
+        try {
+            const hash = window.location.hash;
+            if (hash && hash.includes('#capitalReg=')) {
+                const b64 = hash.split('#capitalReg=')[1];
+                const jsonStr = atob(b64);
+                const data = JSON.parse(jsonStr);
+                sessionStorage.setItem('capitalRegData', JSON.stringify(data));
+                return data;
+            }
+        } catch (e) {
+            console.error('Lỗi parse data từ Hash:', e);
+            setDebug('Lỗi giải mã dữ liệu Hash: ' + e.message, '#be123c');
+        }
+        
+        try {
+            const saved = sessionStorage.getItem('capitalRegData');
+            if (saved) {
+                return JSON.parse(saved);
+            }
+        } catch (e) {
+            console.error('Lỗi lấy data từ sessionStorage:', e);
+        }
+        return null;
+    }
+
+    const regData = getRegData();
+
+    // Helpers
+    function wait(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function simulateTyping(input, text) {
+        if (!input) return;
+        input.focus();
+        
+        // Sử dụng native value setter của React để đồng bộ state lập tức
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set || 
+                                       Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+        if (nativeInputValueSetter) {
+            nativeInputValueSetter.call(input, text);
+        } else {
+            input.value = text;
+        }
+
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.dispatchEvent(new Event('blur', { bubbles: true }));
+        
+        // Click chuột ra ngoài (vào body hoặc tiêu đề) để kích hoạt validate
+        setTimeout(() => {
+            const container = document.querySelector('h1') || document.querySelector('h2') || document.body;
+            if (container) {
+                const clickEvent = new MouseEvent('click', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true
+                });
+                container.dispatchEvent(clickEvent);
+            }
+        }, 100);
+    }
+
+    function generateMkCapital(pass) {
+        let newPass = pass + "A!";
+        // Replace consecutive duplicate characters with a single one (e.g. 11 -> 1, aa -> a)
+        return newPass.replace(/(.)\1+/g, "$1");
+    }
+
+    const firstNames = ["James", "John", "Robert", "Michael", "William", "David", "Richard", "Charles", "Joseph", "Thomas", "Christopher", "Daniel", "Paul", "Mark", "Donald", "George", "Kenneth", "Steven", "Edward", "Brian", "Ronald", "Anthony", "Kevin", "Jason", "Matthew", "Gary", "Timothy", "Jose", "Larry", "Jeffrey", "Frank", "Scott", "Eric", "Stephen", "Andrew", "Raymond", "Gregory", "Joshua", "Jerry", "Dennis", "Walter", "Patrick", "Peter", "Harold", "Douglas", "Henry", "Carl", "Arthur", "Ryan", "Roger", "Joe", "Juan", "Jack", "Albert", "Jonathan", "Justin", "Terry", "Gerald", "Keith", "Samuel", "Ralph", "Lawrence", "Nicholas", "Roy", "Benjamin", "Bruce", "Brandon", "Adam", "Harry", "Fred", "Wayne", "Billy", "Steve", "Louis", "Jeremy", "Aaron", "Randy", "Howard", "Eugene", "Carlos", "Russell", "Bobby", "Victor", "Martin", "Ernest", "Phillip", "Todd", "Jesse", "Craig", "Alan", "Shawn", "Clarence", "Sean", "Philip", "Chris", "Johnny", "Earl", "Jimmy", "Antonio", "Danny", "Bryan", "Tony", "Luis", "Mike", "Stanley", "Leonard", "Nathan", "Dale", "Manuel", "Rodney", "Curtis", "Norman", "Allen", "Marvin", "Vincent", "Glenn", "Jeffery", "Travis", "Jeff", "Chad", "Jacob", "Lee", "Melvin", "Alfred", "Bradley", "Francis", "Stephen", "Mary", "Patricia", "Linda", "Barbara", "Elizabeth", "Jennifer", "Maria", "Susan", "Margaret", "Dorothy", "Lisa", "Nancy", "Karen", "Betty", "Helen", "Sandra", "Donna", "Carol", "Ruth", "Sharon", "Michelle", "Laura", "Sarah", "Kimberly", "Deborah", "Jessica", "Shirley", "Cynthia", "Angela", "Melissa", "Brenda", "Amy", "Anna", "Rebecca", "Virginia", "Kathleen", "Pamela", "Martha", "Debra", "Amanda", "Stephanie", "Carolyn", "Christine", "Marie", "Janet", "Catherine", "Frances", "Ann", "Joyce", "Diane", "Alice", "Julie", "Heather", "Teresa", "Doris", "Gloria", "Evelyn", "Jean", "Cheryl", "Mildred", "Katherine", "Joan", "Ashley", "Judith", "Rose", "Janice", "Kelly", "Nicole", "Judy", "Christina", "Kathy", "Theresa", "Beverly", "Denise", "Tammy", "Irene", "Jane", "Lori", "Rachel", "Marilyn", "Andrea", "Kathryn", "Louise", "Sara", "Anne", "Jacqueline", "Wanda", "Bonnie", "Julia", "Ruby", "Lois", "Tina", "Phyllis", "Norma", "Paula", "Diana", "Annie", "Lillian", "Emily", "Robin", "Peggy", "Crystal", "Gladys", "Rita", "Dawn", "Connie", "Florence", "Tracy", "Edna", "Tiffany", "Carmen", "Rosa", "Cindy", "Grace", "Wendy", "Victoria", "Edith", "Kim", "Sherry", "Sylvia", "Josephine", "Thelma", "Shannon", "Sheila", "Ethel", "Ellen", "Elaine", "Marjorie", "Carrie", "Charlotte", "Monica", "Esther", "Pauline", "Emma", "Juanita", "Anita", "Rhonda", "Hazel", "Amber", "Eva", "Debbie", "April", "Leslie", "Clara", "Lucille", "Jamie", "Joanne", "Eleanor", "Valerie", "Danielle", "Megan", "Alicia", "Suzanne", "Michele", "Gail", "Bertha", "Darlene", "Veronica", "Jill", "Erin", "Geraldine", "Lauren", "Cathy", "Joann", "Lorraine", "Lynn", "Sally", "Regina", "Erica", "Beatrice", "Dolores", "Bernice", "Audrey", "Yvonne", "Annette", "June", "Samantha", "Marion", "Dana", "Stacy", "Ana", "Renee", "Ida", "Vivian", "Roberta", "Holly", "Brittany", "Melanie", "Loretta", "Yolanda", "Jeanette", "Laurie", "Katie", "Kristen", "Vanessa", "Alma", "Sue", "Elsie", "Beth", "Jeanne"];
+    const lastNames = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin", "Lee", "Perez", "Thompson", "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson", "Walker", "Young", "Allen", "King", "Wright", "Scott", "Torres", "Nguyen", "Hill", "Flores", "Green", "Adams", "Nelson", "Baker", "Hall", "Rivera", "Campbell", "Mitchell", "Carter", "Roberts", "Gomez", "Phillips", "Evans", "Turner", "Diaz", "Parker", "Cruz", "Edwards", "Collins", "Reyes", "Stewart", "Morris", "Morales", "Murphy", "Cook", "Rogers", "Gutierrez", "Ortiz", "Morgan", "Cooper", "Peterson", "Bailey", "Reed", "Kelly", "Howard", "Ramos", "Kim", "Cox", "Ward", "Richardson", "Watson", "Brooks", "Chavez", "Wood", "James", "Bennett", "Gray", "Mendoza", "Ruiz", "Hughes", "Price", "Alvarez", "Castillo", "Sanders", "Patel", "Myers", "Long", "Ross", "Foster", "Jimenez"];
+
+    function getRandomUSName() {
+        const first = firstNames[Math.floor(Math.random() * firstNames.length)];
+        const last = lastNames[Math.floor(Math.random() * lastNames.length)];
+        return { first, last };
+    }
+
+    function getRandomUSZip() {
+        const zips = ["10001", "90001", "33101", "60601", "77001", "19101", "85001", "92101", "75201", "95101", "78701", "32201", "94101", "43201", "46201", "76101", "28201", "98101", "80201", "20001"];
+        return zips[Math.floor(Math.random() * zips.length)];
+    }
+
+    function pushStatus(status, mkCapital, errorMsg = '') {
+        if (!regData) return Promise.resolve();
+        return fetch('http://127.0.0.1:3001/api/capital-reg-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: regData.email,
+                sheetId: regData.sheetId,
+                sheetName: regData.sheetName,
+                rowIndex: regData.rowIndex,
+                status,
+                mkCapital,
+                errorMsg
+            })
+        });
+    }
+
+    async function runFlow() {
+        initDebug();
+        const url = window.location.href;
+
+        if (!regData || !regData.isAutoReg) {
+            setDebug('Chờ lệnh từ Tool (Vui lòng click tạo từ giao diện)', '#475569');
+            return;
+        }
+
+        setDebug(`Đang chạy tự động đăng ký cho:<br><b>${regData.email}</b>`, '#2563eb');
+
+        // 1. ĐĂNG KÝ MỚI
+        // 1. ĐĂNG KÝ MỚI
+        if (url.includes('/onboarding/base')) {
+            // Tự động mở tab Hotmail song song bằng GM_openInTab để bypass Popup Blocker của trình duyệt
+            try {
+                const mailTabKey = 'mailTabOpened_' + regData.email;
+                if (!sessionStorage.getItem(mailTabKey)) {
+                    sessionStorage.setItem(mailTabKey, 'true');
+                    const base64Data = window.location.hash.split('#capitalReg=')[1];
+                    const oauthUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=9199bf20-a13f-4107-85dc-02114787ef48&scope=https%3A%2F%2Foutlook.office.com%2F.default%20openid%20profile%20offline_access&redirect_uri=https%3A%2F%2Foutlook.live.com%2Fmail%2F&client-request-id=ccdd58c9-ae4b-3c55-0ffa-c890dfa17330&response_mode=fragment&client_info=1&clidata=1&prompt=select_account&nonce=019f4231-f4ad-74cb-8f28-7ffa09210948&state=eyJpZCI6IjAxOWY0MjMxLWY0YWQtNzY1YS1hYjViLThiMDJiNGY1ZDAwZCIsIm1ldGEiOnsiaW50ZXJhY3Rpb25UeXBlIjoicmVkaXJlY3QifX0%3D%7CaHR0cHM6Ly9vdXRsb29rLmxpdmUuY29tL21haWwv&claims=%7B%22access_token%22%3A%7B%22xms_cc%22%3A%7B%22values%22%3A%5B%22CP1%22%5D%7D%7D%7D&x-client-SKU=msal.js.browser&x-client-VER=5.12.0&response_type=code&code_challenge=ODz59kCxQQ4SOagHJIdLUBvPIKLbvUc-t70OHFFwS-w&code_challenge_method=S256&cobrandid=ab0455a0-8d03-46b9-b18b-df2f57b9e44c&fl=dob%2Cflname%2Cwld#capitalReg=${base64Data}`;
+                    GM_openInTab(oauthUrl, { active: false });
+                }
+            } catch (e) {
+                console.error('Lỗi mở tab Hotmail song song:', e);
+            }
+
+            // Kiểm tra xem trang có hiển thị thông báo tài khoản đã tồn tại hay không
+            if (document.body.innerText.includes("There is an existing account associated with your email")) {
+                setDebug('⚠️ Tài khoản đã tồn tại! Đang chuyển thẳng sang trang Quên mật khẩu...', '#d97706');
+                await wait(500);
+                window.location.href = `https://capitaloneshopping.com/recover-password#capitalReg=${window.location.hash.split('=')[1]}`;
+                return;
+            }
+
+            // Kiểm tra xem trang có đang hiển thị "Check your inbox" hay không
+            if (document.body.innerText.includes("Check your inbox") || document.body.innerText.includes("Your account was created")) {
+                setDebug('[Bước 1] Đã phát hiện trang Check your inbox! Đang chuyển hướng sang trang Quên mật khẩu...', '#16a34a');
+                await wait(500);
+                window.location.href = `https://capitaloneshopping.com/recover-password#capitalReg=${window.location.hash.split('=')[1]}`;
+                return;
+            }
+
+            setDebug(`[Bước 1] Đang điền email: ${regData.email}...`);
+            await wait(1000);
+            const emailInput = document.querySelector('input[placeholder="Enter Email"]') || 
+                               document.querySelector('input[autocomplete="username"]') || 
+                               document.querySelector('input[type="email"]') || 
+                               document.querySelector('input[name="email"]');
+            if (emailInput) {
+                simulateTyping(emailInput, regData.email);
+                await wait(500);
+                
+                // Tích chọn checkbox đồng ý điều khoản
+                const checkbox = document.querySelector('button[role="checkbox"]') || 
+                                 document.querySelector('input[type="checkbox"]');
+                if (checkbox) {
+                    setDebug('[Bước 1] Tích chọn đồng ý điều khoản...');
+                    checkbox.click();
+                    await wait(300);
+                }
+                
+                // Click ra ngoài thêm lần nữa
+                document.body.click();
+                await wait(300);
+
+                const submitBtn = document.querySelector('button[type="submit"]') || 
+                                   document.querySelector('button._submit-button_1f373_8') || 
+                                   document.querySelector('button.sc-eBptik') || 
+                                   document.querySelector('button[class*="Button"]');
+                if (submitBtn) {
+                    setDebug('[Bước 1] Mở khóa và click nút Submit đăng ký...');
+                    submitBtn.disabled = false;
+                    submitBtn.removeAttribute('disabled');
+                    submitBtn.click();
+                    
+                    // Vòng lặp chờ giải Captcha và chờ màn hình "Check your inbox" xuất hiện
+                    setDebug('⏳ Chờ giải Captcha / Xử lý đăng ký... (Script sẽ tự động chuyển hướng khi xong)', '#d97706');
+                    while (true) {
+                        await wait(1000);
+                        const text = document.body.innerText;
+                        
+                        // Nếu tài khoản đã tồn tại
+                        if (text.includes("There is an existing account associated with your email")) {
+                            setDebug('⚠️ Tài khoản đã tồn tại! Đang chuyển thẳng sang trang Quên mật khẩu...', '#d97706');
+                            await wait(500);
+                            window.location.href = `https://capitaloneshopping.com/recover-password#capitalReg=${window.location.hash.split('=')[1]}`;
+                            return;
+                        }
+                        
+                        if (text.includes("Check your inbox") || text.includes("Your account was created") || text.includes("verify your email address")) {
+                            setDebug('🎉 Đăng ký thành công (Đã hiện Check your inbox!). Đang chuyển hướng sang Quên mật khẩu...', '#16a34a');
+                            await wait(500);
+                            window.location.href = `https://capitaloneshopping.com/recover-password#capitalReg=${window.location.hash.split('=')[1]}`;
+                            return;
+                        }
+                    }
+                } else {
+                    setDebug('[Lỗi] Không tìm thấy nút Submit đăng ký', '#be123c');
+                }
+            } else {
+                setDebug('[Lỗi] Không tìm thấy ô điền email trên trang Onboarding', '#be123c');
+                await pushStatus('error', '', 'Không tìm thấy form đăng ký');
+            }
+        }
+
+        // 2. YÊU CẦU RESET PASSWORD
+        else if (url.includes('/recover-password')) {
+            setDebug(`[Bước 2] Đang yêu cầu reset mật khẩu cho: ${regData.email}...`);
+            await wait(1000);
+            const emailInput = document.querySelector('input[type="email"]') || document.querySelector('input[name="email"]');
+            if (emailInput) {
+                simulateTyping(emailInput, regData.email);
+                await wait(500);
+                
+                // Click ra ngoài
+                document.body.click();
+                await wait(300);
+
+                const submitBtn = document.querySelector('button[type="submit"]') || document.querySelector('button');
+                if (submitBtn) {
+                    setDebug('[Bước 2] Mở khóa và click gửi yêu cầu reset...');
+                    submitBtn.disabled = false;
+                    submitBtn.removeAttribute('disabled');
+                    submitBtn.click();
+                    await wait(2000);
+                    setDebug('[Bước 2] Đã gửi yêu cầu reset mật khẩu thành công! Tab này sẽ tự đóng...', '#16a34a');
+                    await wait(1000);
+                    window.close();
+                } else {
+                    setDebug('[Lỗi] Không tìm thấy nút gửi yêu cầu reset', '#be123c');
+                }
+            } else {
+                setDebug('[Lỗi] Không tìm thấy ô email trên trang Quên mật khẩu', '#be123c');
+            }
+        }
+
+        // 3. ĐẶT MẬT KHẨU MỚI TỪ LINK RESET
+        else if (url.includes('/reset-password') || url.includes('token=')) {
+            setDebug(`[Bước 3] Nhận link reset từ Mail. Đang đổi mật khẩu mới...`);
+            await wait(1000);
+            const passInputs = document.querySelectorAll('input[type="password"]');
+            if (passInputs.length > 0) {
+                const mkMail = regData.pass || 'DefaultPass123';
+                const newMkCapital = generateMkCapital(mkMail);
+                
+                setDebug(`[Bước 3] Đang điền mật khẩu Capital mới...`);
+                passInputs.forEach(input => simulateTyping(input, newMkCapital));
+                await wait(500);
+                
+                const submitBtn = document.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    setDebug('[Bước 3] Đang click Lưu mật khẩu mới...');
+                    submitBtn.click();
+                    
+                    const updatedData = { ...regData, generatedPass: newMkCapital };
+                    const newHash = btoa(JSON.stringify(updatedData));
+                    
+                    await wait(2500);
+                    setDebug('[Bước 3] Chuyển hướng sang cài đặt tài khoản để cập nhật Zip/Tên...');
+                    window.location.href = `https://capitaloneshopping.com/settings/account#capitalReg=${newHash}`;
+                    return;
+                } else {
+                    setDebug('[Lỗi] Không tìm thấy nút Submit reset pass', '#be123c');
+                }
+            } else {
+                setDebug('[Lỗi] Không tìm thấy ô nhập mật khẩu mới trên trang Reset', '#be123c');
+            }
+        }
+
+        // 4. CẬP NHẬT TÊN VÀ ZIP
+        else if (url.includes('/settings/account')) {
+            setDebug('[Bước 4] Đang cập nhật Tên và Zipcode để hoàn tất...');
+            await wait(1500);
+            
+            const inputs = document.querySelectorAll('input');
+             const finalFirstName = regData.firstName || getRandomUSName().first;
+             const finalLastName = regData.lastName || getRandomUSName().last;
+             const finalZip = regData.zipCode || getRandomUSZip();
+ 
+             for (let input of inputs) {
+                 const nameAttr = (input.name || '').toLowerCase();
+                 const placeholder = (input.placeholder || '').toLowerCase();
+                 
+                 if (nameAttr.includes('first') || placeholder.includes('first name')) {
+                     simulateTyping(input, finalFirstName);
+                 }
+                 else if (nameAttr.includes('last') || placeholder.includes('last name')) {
+                     simulateTyping(input, finalLastName);
+                 }
+                 else if (nameAttr.includes('zip') || placeholder.includes('zip')) {
+                     simulateTyping(input, finalZip);
+                 }
+             }
+
+            await wait(500);
+            const saveBtns = Array.from(document.querySelectorAll('button')).filter(b => b.innerText.toLowerCase().includes('save') || b.innerText.toLowerCase().includes('update'));
+            
+            if (saveBtns.length > 0) {
+                setDebug('[Bước 4] Click nút Save thông tin...');
+                saveBtns[0].click();
+                await wait(1500);
+            }
+
+            setDebug('🎉 HOÀN THÀNH ĐĂNG KÝ! Đang báo cáo về hệ thống...', '#16a34a');
+            await pushStatus('ok', regData.generatedPass || 'OK');
+            
+            await wait(1000);
+            setDebug('Đang tự động đóng tab này...');
+            window.close();
+        }
+    }
+
+    // Chạy khi trang đã sẵn sàng
+    if (document.readyState === 'complete') {
+        runFlow();
+    } else {
+        window.addEventListener('load', runFlow);
+    }
+})();

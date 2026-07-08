@@ -39,7 +39,7 @@ export function FilterBar({
             onChange={(e) => onChangeName(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg"
           >
-            <option value="" disabled>-- Chọn người cần xem --</option>
+            <option value="">Tất cả người tạo</option>
             {uniqueNames.map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}

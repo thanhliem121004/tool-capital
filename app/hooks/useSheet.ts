@@ -16,12 +16,37 @@ export type SheetRow = {
   code: string;
   isDone: boolean;
   isPasswordError?: boolean;
+  firstName?: string;
+  lastName?: string;
+  zipCode?: string;
 };
 
 export function extractSheetId(url: string): string {
   const m = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
   return m ? m[1] : url.trim();
 }
+
+const safeLocalStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      if (typeof window !== 'undefined') {
+        return window.localStorage.getItem(key);
+      }
+    } catch (e) {
+      console.warn('[Storage] Cannot read localStorage:', e);
+    }
+    return null;
+  },
+  setItem: (key: string, value: string): void => {
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(key, value);
+      }
+    } catch (e) {
+      console.warn('[Storage] Cannot write localStorage:', e);
+    }
+  }
+};
 
 export function useSheet(initialSheetId: string, initialSheetName = 'Sheet1', initialMode: 'default' | 'capital' = 'default') {
   const [sheetId, setSheetId] = useState(initialSheetId);
@@ -34,12 +59,12 @@ export function useSheet(initialSheetId: string, initialSheetName = 'Sheet1', in
 
   // Khởi tạo thông tin từ localStorage sau khi component mounted để tránh hydration mismatch
   useEffect(() => {
-    const savedId = localStorage.getItem('sheetId');
-    const savedName = localStorage.getItem('sheetName');
-    const savedMode = localStorage.getItem('sheetMode') as 'default' | 'capital';
-    if (savedId) setSheetId(savedId);
-    if (savedName) setSheetName(savedName);
-    if (savedMode) setMode(savedMode);
+    const savedId = safeLocalStorage.getItem('sheetId');
+    const savedName = safeLocalStorage.getItem('sheetName');
+    const savedMode = safeLocalStorage.getItem('sheetMode');
+    if (savedId && savedId !== 'null' && savedId.trim() !== '') setSheetId(savedId);
+    if (savedName && savedName !== 'null' && savedName.trim() !== '') setSheetName(savedName);
+    if (savedMode && savedMode !== 'null' && savedMode.trim() !== '') setMode(savedMode as any);
     setIsReady(true);
   }, []);
 

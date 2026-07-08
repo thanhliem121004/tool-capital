@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { sheetId, rowIndex, emailTao } = await request.json();
+    const { sheetId, rowIndex, emailTao, firstName, lastName, zipCode } = await request.json();
 
-    if (!sheetId || !rowIndex || !emailTao) {
+    if (!sheetId || !rowIndex) {
       return NextResponse.json(
         { success: false, error: 'Thiếu tham số' },
         { status: 400 }
@@ -31,24 +31,35 @@ export async function POST(request: NextRequest) {
 
     const sheets = google.sheets({ version: 'v4', auth });
 
-    // Ghi vào cột E
-    const range = `E${rowIndex}`;
+    // Ghi vào cột E nếu có emailTao
+    if (emailTao) {
+      const range = `E${rowIndex}`;
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: range,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [[emailTao]]
+        }
+      });
+    }
 
-    const result = await sheets.spreadsheets.values.update({
-      spreadsheetId: sheetId,
-      range: range,
-      valueInputOption: 'RAW',
-      requestBody: {
-        values: [[emailTao]]
-      }
-    });
-
-    console.log('Update result:', result.data);
+    // Ghi vào cột H, I, J nếu có thông tin Tên & Zip
+    if (firstName !== undefined || lastName !== undefined || zipCode !== undefined) {
+      const range = `H${rowIndex}:J${rowIndex}`;
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: range,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [[firstName ?? '', lastName ?? '', zipCode ?? '']]
+        }
+      });
+    }
 
     return NextResponse.json({
       success: true,
-      message: `Đã ghi "${emailTao}" vào hàng ${rowIndex}, cột E!`,
-      data: result.data
+      message: `Đã ghi cập nhật thành công cho hàng ${rowIndex}!`,
     });
 
   } catch (error: unknown) {
