@@ -1288,6 +1288,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
 
               <button
                 onClick={async (e) => {
+                  const btn = e.currentTarget;
                   try {
                     const info = await ensureUSInfoPopulated();
                     const accData = {
@@ -1309,12 +1310,11 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                     const checkUrl = `https://capitaloneshopping.com/onboarding/base#capitalReg=${base64Data}`;
                     
                     navigator.clipboard.writeText(checkUrl);
-                    const btn = e.currentTarget;
                     const oldText = btn.innerHTML;
                     btn.innerHTML = '✅ Đã Copy!';
                     setTimeout(() => { btn.innerHTML = oldText; }, 1500);
                   } catch (err) {
-                    alert('Lỗi copy link: ' + String(err));
+                    console.error('Lỗi copy link:', err);
                   }
                 }}
                 type="button"
@@ -1425,27 +1425,31 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                     
                     <button
                       onClick={async (e) => {
-                        const info = await ensureUSInfoPopulated();
-                        const accData = {
-                          sheetId,
-                          sheetName,
-                          rowIndex: row.rowIndex,
-                          email: row.email,
-                          pass: row.password,
-                          code: row.code,
-                          recovery: row.recovery,
-                          oldRecovery: row.oldRecovery,
-                          firstName: info.firstName,
-                          lastName: info.lastName,
-                          zipCode: info.zipCode,
-                          isAutoReg: true
-                        };
-                        const base64Data = btoa(unescape(encodeURIComponent(JSON.stringify(accData))));
-                        navigator.clipboard.writeText(serverResetLink + `#capitalReg=${base64Data}`);
                         const btn = e.currentTarget;
-                        const oldText = btn.innerHTML;
-                        btn.innerHTML = '✅ Đã Copy!';
-                        setTimeout(() => { btn.innerHTML = oldText; }, 1500);
+                        try {
+                          const info = await ensureUSInfoPopulated();
+                          const accData = {
+                            sheetId,
+                            sheetName,
+                            rowIndex: row.rowIndex,
+                            email: row.email,
+                            pass: row.password,
+                            code: row.code,
+                            recovery: row.recovery,
+                            oldRecovery: row.oldRecovery,
+                            firstName: info.firstName,
+                            lastName: info.lastName,
+                            zipCode: info.zipCode,
+                            isAutoReg: true
+                          };
+                          const base64Data = btoa(unescape(encodeURIComponent(JSON.stringify(accData))));
+                          navigator.clipboard.writeText(serverResetLink + `#capitalReg=${base64Data}`);
+                          const oldText = btn.innerHTML;
+                          btn.innerHTML = '✅ Đã Copy!';
+                          setTimeout(() => { btn.innerHTML = oldText; }, 1500);
+                        } catch (err) {
+                          console.error('Lỗi copy link:', err);
+                        }
                       }}
                       type="button"
                       className="px-2.5 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-bold text-[11px] transition-colors"
