@@ -105,6 +105,41 @@
 
     function makeRequest(url, method, data, callback) {
         if (typeof GM_xmlhttpRequest !== 'undefined') {
+            if (url.includes('127.0.0.1:3000') || url.includes('localhost:3000')) {
+                const url3001 = url.replace(':3000', ':3001');
+                GM_xmlhttpRequest({
+                    method: method,
+                    url: url3001,
+                    headers: { "Content-Type": "application/json" },
+                    data: data ? JSON.stringify(data) : null,
+                    onload: function(res) {
+                        try {
+                            const json = JSON.parse(res.responseText);
+                            if (json && (json.success !== undefined || json.account !== undefined)) {
+                                callback(null, res.responseText);
+                                return;
+                            }
+                        } catch(e) {}
+                        callFallback();
+                    },
+                    onerror: function() {
+                        callFallback();
+                    }
+                });
+
+                function callFallback() {
+                    GM_xmlhttpRequest({
+                        method: method,
+                        url: url,
+                        headers: { "Content-Type": "application/json" },
+                        data: data ? JSON.stringify(data) : null,
+                        onload: function(res) { callback(null, res.responseText); },
+                        onerror: function(err) { callback(err, null); }
+                    });
+                }
+                return;
+            }
+
             GM_xmlhttpRequest({
                 method: method,
                 url: url,
@@ -1646,6 +1681,41 @@
 
     function makeRequest(url, method, data, callback) {
         if (typeof GM_xmlhttpRequest !== 'undefined') {
+            if (url.includes('127.0.0.1:3000') || url.includes('localhost:3000')) {
+                const url3001 = url.replace(':3000', ':3001');
+                GM_xmlhttpRequest({
+                    method: method,
+                    url: url3001,
+                    headers: { "Content-Type": "application/json" },
+                    data: data ? JSON.stringify(data) : null,
+                    onload: function(res) {
+                        try {
+                            const json = JSON.parse(res.responseText);
+                            if (json && (json.success !== undefined || json.account !== undefined)) {
+                                callback(null, res.responseText);
+                                return;
+                            }
+                        } catch(e) {}
+                        callFallback();
+                    },
+                    onerror: function() {
+                        callFallback();
+                    }
+                });
+
+                function callFallback() {
+                    GM_xmlhttpRequest({
+                        method: method,
+                        url: url,
+                        headers: { "Content-Type": "application/json" },
+                        data: data ? JSON.stringify(data) : null,
+                        onload: function(res) { callback(null, res.responseText); },
+                        onerror: function(err) { callback(err, null); }
+                    });
+                }
+                return;
+            }
+
             GM_xmlhttpRequest({
                 method: method,
                 url: url,
@@ -1679,13 +1749,24 @@
     }
 
     function scrapOtpFromDOM() {
-        const pageText = document.body.innerText || '';
-        const matches = pageText.match(/\b\d{6}\b/g);
+        let pageText = document.body.innerText || '';
+        try {
+            const iframes = document.querySelectorAll('iframe');
+            for (let i = 0; i < iframes.length; i++) {
+                try {
+                    if (iframes[i].contentDocument && iframes[i].contentDocument.body) {
+                        pageText += ' ' + (iframes[i].contentDocument.body.innerText || '');
+                    }
+                } catch(e) {}
+            }
+        } catch(e) {}
+
+        const matches = pageText.match(/\b\d{6,7}\b/g);
         if (matches) {
             const otp = matches.find(m => m !== '707070');
             if (otp) {
                 const lowerText = pageText.toLowerCase();
-                const isMicrosoft = lowerText.includes('microsoft') || lowerText.includes('ma bao mat') || lowerText.includes('security code');
+                const isMicrosoft = lowerText.includes('microsoft') || lowerText.includes('ma bao mat') || lowerText.includes('security code') || lowerText.includes('mã bảo mật') || lowerText.includes('capital');
                 if (isMicrosoft) {
                     return otp;
                 }
@@ -1843,7 +1924,7 @@
         }
     }
 
-    function fetchAndPostOtp(email) {
+    function fetchAndPostOtp(email, apiBase) {
         const host = window.location.host.toLowerCase();
         if (host.includes('smvmail.com')) {
             const url = `https://smvmail.com/api/email?page=1&q=&email=${encodeURIComponent(email)}&_t=${Date.now()}`;
@@ -1858,7 +1939,7 @@
                             const otp = extractOtpFromHtml(doc.html, doc.text);
                             if (otp) {
                                 setDebug(`Phat hien OTP SMVmail: ${otp}`, '#22c55e');
-                                makeRequest(API_OTP_BRIDGE, "POST", { email: email, otp: otp }, function() {});
+                                makeRequest(`${apiBase}/api/otp-bridge`, "POST", { email: email, otp: otp }, function() {});
                                 break;
                             }
                         }
@@ -1882,7 +1963,7 @@
                                 const otp = extractOtpFromHtml(bodyData.html, bodyData.text);
                                 if (otp) {
                                     setDebug(`Phat hien OTP Inboxes: ${otp}`, '#22c55e');
-                                    makeRequest(API_OTP_BRIDGE, "POST", { email: email, otp: otp }, function() {});
+                                    makeRequest(`${apiBase}/api/otp-bridge`, "POST", { email: email, otp: otp }, function() {});
                                 }
                             } catch(e) {}
                         });
@@ -1894,80 +1975,180 @@
         }
     }
 
-    // Vong lap chinh dong bo va chay
-    setInterval(() => {
-        makeRequest(API_CURRENT_ACCOUNT, "GET", null, function(err, responseText) {
-            if (err) {
-                setDebug('Loi dong bo Tool local...', '#ef4444');
+    function handleFviaInboxes(email) {
+        if (isAddingInbox) return;
+        const parts = email.split('@');
+        const username = parts[0];
+        const domain = parts[1];
+        if (!username || !domain) return;
+
+        // 1. Tim input username theo ID va Name
+        const usernameInput = document.getElementById('username') ||
+                              document.querySelector('input[name="username"]') ||
+                              document.querySelector('input[type="text"]') || 
+                              document.querySelector('input');
+                              
+        if (usernameInput && usernameInput.offsetWidth > 0) {
+            if (usernameInput.value !== username) {
+                setDebug(`Dien username fvia: ${username}`, '#0284c7');
+                safeFill(usernameInput, username);
                 return;
             }
+
+            // 2. Tim select domain (neu co)
+            const selectEl = document.querySelector('select');
+            if (selectEl && selectEl.offsetWidth > 0) {
+                const targetOption = Array.from(selectEl.options).find(opt => 
+                    opt.value.toLowerCase().includes(domain) || 
+                    opt.text.toLowerCase().includes(domain)
+                );
+                if (targetOption && selectEl.value !== targetOption.value) {
+                    setDebug(`Chon domain fvia: ${domain}`, '#0284c7');
+                    selectEl.value = targetOption.value;
+                    selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+                    return;
+                }
+            }
+
+            // 3. Click nut Get Email hoac submit button
+            const checkBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                const txt = (btn.textContent || '').trim().toLowerCase();
+                return txt.includes('get email') || txt.includes('check') || txt.includes('go');
+            }) || document.querySelector('button[type="submit"]') || document.querySelector('button');
+
+            if (checkBtn && checkBtn.offsetWidth > 0) {
+                setDebug(`Click Get Email fvia...`, '#16a34a');
+                isAddingInbox = true;
+                safeClick(checkBtn);
+                setTimeout(() => { isAddingInbox = false; }, 3000);
+            }
+        }
+    }
+
+    // Vong lap chinh dong bo va chay
+    setInterval(() => {
+        function processAccount(resData, apiBase) {
             try {
-                const resData = JSON.parse(responseText);
                 const account = resData?.account;
                 const recoveryEmail = account?.recovery || account?.newRecovery;
                 if (resData.success && account && recoveryEmail) {
                     const email = recoveryEmail.toLowerCase().trim();
                     const pageText = (document.body.innerText || '').toLowerCase();
-                    const isMailboxActive = pageText.includes(email);
+                    
+                    const isFviaHost = window.location.host.includes('fviainboxes.com') ||
+                                       window.location.host.includes('fviadropinbox.com') ||
+                                       window.location.host.includes('fviamail.work') ||
+                                       window.location.host.includes('dropinboxes.com');
+
+                    let isMailboxActive = pageText.includes(email) || 
+                                          window.location.href.includes(email) || 
+                                          window.location.href.includes(encodeURIComponent(email));
+                                          
+                    if (isFviaHost) {
+                        const hasInbox = Array.from(document.querySelectorAll('h1, h2, h3, div, span, p')).some(el => {
+                            const t = (el.textContent || '').trim().toLowerCase();
+                            return (t === 'inbox' || t === 'hộp thư') && el.offsetWidth > 0;
+                        });
+                        const hasMessages = document.querySelector('li, tr, [role="row"]') !== null;
+                        if (hasInbox || hasMessages) {
+                            isMailboxActive = true;
+                        }
+                    }
 
                     // 1. Uu tien cao OTP truc tiep tu DOM neu nguoi dung dang mo trang doc thu
                     const domOtp = scrapOtpFromDOM();
                     if (domOtp) {
                         setDebug(`Phat hien OTP tu man hinh: ${domOtp}`, '#22c55e');
-                        makeRequest(API_OTP_BRIDGE, "POST", { email: email, otp: domOtp }, function() {});
+                        makeRequest(`${apiBase}/api/otp-bridge`, "POST", { email: email, otp: domOtp }, function() {});
                         return;
                     }
 
-                    // 2. Kiem tra va tu dong click mo email Microsoft neu dang o trang danh sach
+                    if (isFviaHost) {
+                        if (!isMailboxActive) {
+                            handleFviaInboxes(email);
+                        } else {
+                            setDebug(`Hom thu FVIA dang hoat dong. Dang tu dong cho OTP...`, '#22c55e');
+                            // Bổ sung gọi API ngầm cho Fvia nếu có thể (chung base API với smvmail)
+                            fetchAndPostOtp(email, apiBase);
+                        }
+                        return;
+                    }
+
+                    // 2. Kiem tra va tu dong click mo email Microsoft neu dang o trang danh sach (inboxes.com)
                     if (window.location.host.includes('inboxes.com') && isMailboxActive) {
                         const isReadingPage = window.location.pathname.includes('/read/');
                         if (!isReadingPage) {
-                            // Tìm thẻ div hoặc span chứa "microsoft"
-                            const emailElements = Array.from(document.querySelectorAll('div, span, td, p, h2, h3, h4'));
-                            const microsoftEl = emailElements.find(el => {
-                                if (el.offsetWidth === 0) return false;
-                                const txt = (el.textContent || '').trim().toLowerCase();
-                                return txt.includes('microsoft') && !el.closest('header') && !el.closest('footer');
-                            });
-                            
-                            if (microsoftEl) {
-                                setDebug('🎯 Click mo thu Microsoft...', '#0284c7');
-                                // Tìm thẻ a gần nhất hoặc tr gần nhất
-                                const link = microsoftEl.closest('a');
-                                const row = microsoftEl.closest('tr, li, .email-row');
-                                const target = link || row || microsoftEl;
-                                
-                                const rect = target.getBoundingClientRect();
-                                if (rect.width > 0 && rect.height > 0) {
-                                    const cx = rect.left + rect.width / 2;
-                                    const cy = rect.top + rect.height / 2;
-                                    const opts = { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy };
-                                    target.focus();
-                                    target.dispatchEvent(new PointerEvent('pointerdown', opts));
-                                    target.dispatchEvent(new MouseEvent('mousedown', opts));
-                                    target.dispatchEvent(new PointerEvent('pointerup', opts));
-                                    target.dispatchEvent(new MouseEvent('mouseup', opts));
-                                    target.dispatchEvent(new MouseEvent('click', opts));
-                                    target.click();
-                                } else {
-                                    target.click();
+                            const allElements = Array.from(document.querySelectorAll('*'));
+                            let targetRow = null;
+                            for (let i = allElements.length - 1; i >= 0; i--) {
+                                const el = allElements[i];
+                                if (el.offsetWidth === 0) continue;
+                                if (el.tagName === 'BODY' || el.tagName === 'HTML' || el.tagName === 'MAIN') continue;
+                                if (el.closest('header') || el.closest('footer') || el.closest('nav') || el.closest('.sidebar')) continue;
+
+                                const txt = (el.innerText || el.textContent || '').toLowerCase();
+                                if (txt.includes('microsoft') || txt.includes('ma bao mat') || txt.includes('security code') || txt.includes('mã bảo mật')) {
+                                    if (el.tagName === 'A' || el.tagName === 'TR' || el.tagName === 'LI' || el.tagName === 'TD' ||
+                                        el.classList.contains('cursor-pointer') ||
+                                        getComputedStyle(el).cursor === 'pointer' ||
+                                        el.getAttribute('role') === 'row' ||
+                                        el.getAttribute('role') === 'button' ||
+                                        el.getAttribute('role') === 'cell') {
+                                        targetRow = el;
+                                        break;
+                                    }
                                 }
+                            }
+
+                            if (targetRow) {
+                                const debugClass = targetRow.className ? `.${targetRow.className.replace(/ /g, '.')}` : '';
+                                setDebug(`🎯 Click mo thu Microsoft: <${targetRow.tagName.toLowerCase()}${debugClass}>...`, '#0284c7');
+                                safeClick(targetRow);
+                                const link = targetRow.querySelector('a');
+                                if (link) safeClick(link);
                                 return;
                             }
                         }
                     }
 
-                    // 3. Chay luong tao hom thu hoac check API ngam
+                    // 3. Chay luong tao hom thu hoac check API ngam (inboxes.com & smvmail.com)
                     if (window.location.host.includes('inboxes.com') && !isMailboxActive) {
                         handleAutoAddInbox(email);
                     } else {
-                        fetchAndPostOtp(email);
+                        fetchAndPostOtp(email, apiBase);
                     }
                 } else {
                     setDebug('Cho thong tin email khoi phuc moi tu Tool...', '#eab308');
                 }
             } catch(e) {
                 console.error(e);
+            }
+        }
+
+        // Ưu tiên dò cổng 3001 trước
+        makeRequest('http://127.0.0.1:3001/api/current-account', "GET", null, function(err, responseText) {
+            let handled = false;
+            if (!err) {
+                try {
+                    const resData = JSON.parse(responseText);
+                    if (resData.success && resData.account && (resData.account.recovery || resData.account.newRecovery)) {
+                        handled = true;
+                        processAccount(resData, 'http://127.0.0.1:3001');
+                        return;
+                    }
+                } catch(e) {}
+            }
+            
+            // Fallback sang cổng 3000 nếu cổng 3001 không có account
+            if (!handled) {
+                makeRequest('http://127.0.0.1:3000/api/current-account', "GET", null, function(err2, resText2) {
+                    if (!err2) {
+                        try {
+                            const resData2 = JSON.parse(resText2);
+                            processAccount(resData2, 'http://127.0.0.1:3000');
+                        } catch(e) {}
+                    }
+                });
             }
         });
     }, 2000);

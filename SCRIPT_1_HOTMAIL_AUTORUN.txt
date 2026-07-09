@@ -105,6 +105,41 @@
 
     function makeRequest(url, method, data, callback) {
         if (typeof GM_xmlhttpRequest !== 'undefined') {
+            if (url.includes('127.0.0.1:3000') || url.includes('localhost:3000')) {
+                const url3001 = url.replace(':3000', ':3001');
+                GM_xmlhttpRequest({
+                    method: method,
+                    url: url3001,
+                    headers: { "Content-Type": "application/json" },
+                    data: data ? JSON.stringify(data) : null,
+                    onload: function(res) {
+                        try {
+                            const json = JSON.parse(res.responseText);
+                            if (json && (json.success !== undefined || json.account !== undefined)) {
+                                callback(null, res.responseText);
+                                return;
+                            }
+                        } catch(e) {}
+                        callFallback();
+                    },
+                    onerror: function() {
+                        callFallback();
+                    }
+                });
+
+                function callFallback() {
+                    GM_xmlhttpRequest({
+                        method: method,
+                        url: url,
+                        headers: { "Content-Type": "application/json" },
+                        data: data ? JSON.stringify(data) : null,
+                        onload: function(res) { callback(null, res.responseText); },
+                        onerror: function(err) { callback(err, null); }
+                    });
+                }
+                return;
+            }
+
             GM_xmlhttpRequest({
                 method: method,
                 url: url,

@@ -180,7 +180,14 @@ function generateMkCapitalPreview(pass: string): string {
 
 export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, preferredDomain, mailProvider, mode = 'default', activeEmail, onActive, runDirectly, allRows = [] }: Props) {
   const [isCreatingMail, setIsCreatingMail] = useState(false);
-  const [generated, setGenerated] = useState<string>(row.recovery);
+  const [generated, setGenerated] = useState<string>(row.recovery || '');
+  
+  useEffect(() => {
+    if (row.recovery && !generated) {
+      setGenerated(row.recovery);
+    }
+  }, [row.recovery, generated]);
+
   const [createdAt, setCreatedAt] = useState<number | null>(null);
   const [otp, setOtp] = useState<string>('');
   const [loadingCreate, setLoadingCreate] = useState(false);
@@ -265,7 +272,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
           sheetName,
           rowIndex: row.rowIndex,
           email: row.email,
-          mkCapital: row.mkCapital,
+          mkCapital: row.mkCapital || row.password,
         }),
       });
       const data = await res.json();
@@ -884,10 +891,11 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                 capitalUrl = 'https://capitaloneshopping.com/sign-in';
               }
 
-              // Thiết lập recoveryMailboxUrl đối với email khôi phục mới (Inboxes hoặc SMVmail) để mở song song
+              // Thiết lập recoveryMailboxUrl đối với email khôi phục mới (Inboxes, Fvia hoặc SMVmail) để mở song song
               let recoveryMailboxUrl = '';
               if (generated) {
                 const domain = generated.split('@')[1]?.toLowerCase() || '';
+                const fviaDomains = ['fviainboxes.com', 'fviadropinbox.com', 'fviamail.work', 'dropinboxes.com'];
                 const inboxesDomains = [
                   'inboxes.com', 'blondmail.com', 'chapsmail.com', 'clowmail.com', 'dropjar.com', 
                   'fivermail.com', 'getairmail.com', 'getmule.com', 'getnada.com', 'gimpmail.com', 
@@ -895,9 +903,12 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                   'tafmail.com', 'temptami.com', 'tupmail.com', 'vomoto.com', 'kapsule.info', 'getinbox.work'
                 ];
                 const isSmv = domain === 'smvmail.com';
+                const isFvia = fviaDomains.some(d => domain.includes(d));
                 const isInboxes = inboxesDomains.some(d => domain.includes(d));
                 if (isSmv) {
                   recoveryMailboxUrl = `https://smvmail.com/email/${encodeURIComponent(generated)}`;
+                } else if (isFvia) {
+                  recoveryMailboxUrl = 'https://fviainboxes.com';
                 } else if (isInboxes) {
                   recoveryMailboxUrl = 'https://inboxes.com';
                 }
@@ -1276,7 +1287,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
               </button>
 
               <button
-                onClick={async () => {
+                onClick={async (e) => {
                   try {
                     const info = await ensureUSInfoPopulated();
                     const accData = {
@@ -1298,7 +1309,10 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                     const checkUrl = `https://capitaloneshopping.com/onboarding/base#capitalReg=${base64Data}`;
                     
                     navigator.clipboard.writeText(checkUrl);
-                    alert('Đã copy Link đăng ký! Hãy dán (Paste & Go) vào trình duyệt AdsPower.');
+                    const btn = e.currentTarget;
+                    const oldText = btn.innerHTML;
+                    btn.innerHTML = '✅ Đã Copy!';
+                    setTimeout(() => { btn.innerHTML = oldText; }, 1500);
                   } catch (err) {
                     alert('Lỗi copy link: ' + String(err));
                   }
@@ -1410,7 +1424,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                     </button>
                     
                     <button
-                      onClick={async () => {
+                      onClick={async (e) => {
                         const info = await ensureUSInfoPopulated();
                         const accData = {
                           sheetId,
@@ -1428,7 +1442,10 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                         };
                         const base64Data = btoa(unescape(encodeURIComponent(JSON.stringify(accData))));
                         navigator.clipboard.writeText(serverResetLink + `#capitalReg=${base64Data}`);
-                        alert('Đã copy Link Reset! Hãy dán vào AdsPower.');
+                        const btn = e.currentTarget;
+                        const oldText = btn.innerHTML;
+                        btn.innerHTML = '✅ Đã Copy!';
+                        setTimeout(() => { btn.innerHTML = oldText; }, 1500);
                       }}
                       type="button"
                       className="px-2.5 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-bold text-[11px] transition-colors"
