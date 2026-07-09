@@ -109,8 +109,10 @@ export async function POST(request: NextRequest) {
         const mkCapital = String(r?.[3] ?? '').trim(); // Cột D: Mật khẩu Capital One
         
         const newPassword = String(r?.[11] ?? '').trim(); // Cột L: MK Hotmail mới
-        const recovery = String(r?.[12] ?? '').trim();    // Cột M: Mail khôi phục mới
         const newMkCapital = String(r?.[13] ?? '').trim(); // Cột N: MK Capital mới
+        
+        // Cột F (index 5) là Mail khôi phục mới, hoặc fallback sang cột M (index 12)
+        const recovery = String(r?.[5] ?? '').trim() || String(r?.[12] ?? '').trim();
 
         const capitalStr = newMkCapital.toUpperCase();
         const isPasswordError = newPassword.toUpperCase().includes('SAI MẬT KHẨU') || 
@@ -118,7 +120,9 @@ export async function POST(request: NextRequest) {
                                 capitalStr.includes('SAI CAPITAL') ||
                                 capitalStr.includes('SAI MẬT KHẨU CAPITAL');
                                 
-        const isDone = (recovery.length > 0 || newPassword.length > 0 || newMkCapital.length > 0) && !isPasswordError;
+        // Chỉ coi là hoàn thành (isDone = true) nếu đã đổi xong mật khẩu Hotmail mới hoặc mật khẩu Capital mới.
+        // Có sẵn mail khôi phục mới ở cột F nhưng chưa đổi pass thì vẫn chưa coi là Done.
+        const isDone = (newPassword.length > 0 || newMkCapital.length > 0) && !isPasswordError;
 
         rows.push({
           rowIndex: i + 2, // hàng 1 là tiêu đề nên +2

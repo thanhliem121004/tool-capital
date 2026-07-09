@@ -33,6 +33,16 @@ export async function POST(request: NextRequest) {
     const sheets = google.sheets({ version: 'v4', auth });
 
     if (mode === 'capital') {
+      // Ghi email khôi phục mới vào cột F (Mail khôi phục mới)
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: `'${sheetName}'!F${rowIndex}`,
+        valueInputOption: 'RAW',
+        requestBody: { 
+          values: [[recovery]] 
+        },
+      });
+
       // Ghi 4 cột bắt đầu từ cột K: K (Email Hotmail), L (MK Hotmail mới), M (Mail khôi phục mới), N (MK Capital mới)
       await sheets.spreadsheets.values.update({
         spreadsheetId: sheetId,

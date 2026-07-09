@@ -301,7 +301,7 @@
                     
                     await wait(2500);
                     setDebug('[Bước 3] Chuyển hướng sang cài đặt tài khoản để cập nhật Zip/Tên...');
-                    window.location.href = `https://capitaloneshopping.com/settings/account#capitalReg=${newHash}`;
+                    window.location.href = `https://capitaloneshopping.com/account-settings/profile#capitalReg=${newHash}`;
                     return;
                 } else {
                     setDebug('[Lỗi] Không tìm thấy nút Submit reset pass', '#be123c');
@@ -311,53 +311,108 @@
             }
         }
 
-        // 4. CẬP NHẬT TÊN VÀ ZIP
-        else if (url.includes('/settings/account')) {
-            setDebug('[Bước 4] Đang cập nhật Tên và Zipcode để hoàn tất...');
-            await wait(1500);
+        // 4. CẬP NHẬT TÊN VÀ ZIP (SETTINGS)
+        else if (url.includes('/account-settings/profile') || url.includes('/settings/account') || url.includes('/profile')) {
+            setDebug('[Bước 4] Đang chuẩn bị cập nhật Tên và Zipcode...', '#2563eb');
             
-            const inputs = document.querySelectorAll('input');
-             const finalFirstName = regData.firstName || getRandomUSName().first;
-             const finalLastName = regData.lastName || getRandomUSName().last;
-             const finalZip = regData.zipCode || getRandomUSZip();
- 
-             for (let input of inputs) {
-                 const nameAttr = (input.name || '').toLowerCase();
-                 const placeholder = (input.placeholder || '').toLowerCase();
-                 
-                 if (nameAttr.includes('first') || placeholder.includes('first name')) {
-                     simulateTyping(input, finalFirstName);
-                 }
-                 else if (nameAttr.includes('last') || placeholder.includes('last name')) {
-                     simulateTyping(input, finalLastName);
-                 }
-                 else if (nameAttr.includes('zip') || placeholder.includes('zip')) {
-                     simulateTyping(input, finalZip);
-                 }
-             }
+            let clickAttempted = false;
+            let checkCount = 0;
+            
+            while (checkCount < 30) {
+                await wait(1000);
+                checkCount++;
+                
+                let fnInput = document.querySelector('input[name="firstname"]') || 
+                              document.querySelector('input[name="firstName"]') ||
+                              document.querySelector('input[id="id_firstname"]') ||
+                              document.querySelector('input[placeholder*="First Name"]') ||
+                              document.querySelector('input[placeholder*="first name"]');
+                              
+                let lnInput = document.querySelector('input[name="lastname"]') || 
+                              document.querySelector('input[name="lastName"]') ||
+                              document.querySelector('input[id="id_lastname"]') ||
+                              document.querySelector('input[placeholder*="Last Name"]') ||
+                              document.querySelector('input[placeholder*="last name"]');
+                              
+                let zipInput = document.querySelector('input[name="zipcode"]') || 
+                               document.querySelector('input[name="zipCode"]') ||
+                               document.querySelector('input[id="id_zipcode"]') ||
+                               document.querySelector('input[placeholder*="Zip Code"]') ||
+                               document.querySelector('input[placeholder*="zip code"]');
 
-            await wait(500);
-            const saveBtns = Array.from(document.querySelectorAll('button')).filter(b => b.innerText.toLowerCase().includes('save') || b.innerText.toLowerCase().includes('update'));
-            
-            if (saveBtns.length > 0) {
-                setDebug('[Bước 4] Click nút Save thông tin...');
-                saveBtns[0].click();
-                await wait(1500);
+                if (fnInput && fnInput.offsetWidth > 0 && lnInput && lnInput.offsetWidth > 0 && zipInput && zipInput.offsetWidth > 0) {
+                    const finalFirstName = regData.firstName || getRandomUSName().first;
+                    const finalLastName = regData.lastName || getRandomUSName().last;
+                    const finalZip = regData.zipCode || getRandomUSZip();
+
+                    setDebug(`✍️ Điền thông tin: ${finalFirstName} ${finalLastName} - ${finalZip}`);
+                    simulateTyping(fnInput, finalFirstName);
+                    await wait(300);
+                    simulateTyping(lnInput, finalLastName);
+                    await wait(300);
+                    simulateTyping(zipInput, finalZip);
+                    await wait(500);
+
+                    const saveBtns = Array.from(document.querySelectorAll('button, input[type="submit"]')).filter(b => {
+                        const txt = (b.textContent || b.value || '').toLowerCase();
+                        return txt.includes('save') || txt.includes('update') || txt.includes('submit');
+                    });
+                    
+                    if (saveBtns.length > 0) {
+                        setDebug('[Bước 4] Click nút Save thông tin...');
+                        saveBtns[0].click();
+                        await wait(2500);
+                    } else {
+                        setDebug('[Cảnh báo] Không thấy nút Save, thử nhấn Enter...', '#d97706');
+                        const activeInput = document.activeElement;
+                        if (activeInput) {
+                            activeInput.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13 }));
+                        }
+                        await wait(2500);
+                    }
+
+                    setDebug('🎉 HOÀN THÀNH ĐĂNG KÝ! Đang báo cáo về hệ thống...', '#16a34a');
+                    await pushStatus('ok', regData.generatedPass || 'OK');
+                    await wait(1500);
+                    setDebug('Đang tự động đóng tab này...');
+                    window.close();
+                    return;
+                } 
+                else if (!clickAttempted) {
+                    const changeBtns = Array.from(document.querySelectorAll('button, a')).filter(el => {
+                        const txt = (el.textContent || '').trim().toLowerCase();
+                        return txt === 'change' || txt === 'edit' || txt.includes('change') || txt.includes('edit');
+                    });
+
+                    if (changeBtns.length > 0) {
+                        let targetBtn = changeBtns[0];
+                        for (const btn of changeBtns) {
+                            const parentText = (btn.parentElement?.textContent || '').toLowerCase();
+                            if (!parentText.includes('password')) {
+                                targetBtn = btn;
+                                break;
+                            }
+                        }
+                        setDebug('🖱️ Click nút [Change/Edit] để hiện form...');
+                        targetBtn.click();
+                        clickAttempted = true;
+                        await wait(1000);
+                    } else {
+                        setDebug(`⏳ Đang tìm form hoặc nút Edit... (${checkCount}/30)`, '#475569');
+                    }
+                } else {
+                    setDebug(`⏳ Đang chờ form hiển thị sau khi click... (${checkCount}/30)`, '#475569');
+                }
             }
-
-            setDebug('🎉 HOÀN THÀNH ĐĂNG KÝ! Đang báo cáo về hệ thống...', '#16a34a');
-            await pushStatus('ok', regData.generatedPass || 'OK');
             
-            await wait(1000);
-            setDebug('Đang tự động đóng tab này...');
-            window.close();
+            setDebug('❌ Quá thời gian chờ tải form settings!', '#be123c');
         }
     }
 
-    // Chạy khi trang đã sẵn sàng
-    if (document.readyState === 'complete') {
+    // Khởi chạy khi DOM đã sẵn sàng (đảm bảo chạy cả khi trang đã load hoặc đang ở trạng thái interactive)
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
         runFlow();
     } else {
-        window.addEventListener('load', runFlow);
+        window.addEventListener('DOMContentLoaded', runFlow);
     }
 })();
