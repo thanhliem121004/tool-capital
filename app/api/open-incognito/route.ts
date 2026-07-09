@@ -37,9 +37,16 @@ export async function POST(request: NextRequest) {
     }
 
     const chromePath = getChromePath();
+    const profilePath = path.join(process.cwd(), '.chrome-profile');
     
     // Sử dụng spawn để truyền các đối số (args) dưới dạng mảng
-    const args = ['--incognito', '--new-window'];
+    // Thêm --user-data-dir chỉ định một cấu hình profile riêng biệt nằm trong thư mục dự án
+    // để tránh xung đột ProcessSingleton Lock File khi người dùng đang chạy Chrome thường
+    const args = [
+      '--incognito',
+      '--new-window',
+      `--user-data-dir=${profilePath}`
+    ];
     if (profile) {
       args.push(`--profile-directory=${profile}`);
     }
@@ -65,6 +72,19 @@ export async function POST(request: NextRequest) {
       detached: true,
       stdio: 'ignore'
     });
+    
+    let spawnError: any = null;
+    child.on('error', (err) => {
+      console.error('[open-incognito] Spawn error:', err);
+      spawnError = err;
+    });
+
+    // Chờ 150ms để bắt các lỗi spawn bất đồng bộ (như phân quyền, lỗi tệp tin)
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    if (spawnError) {
+      return NextResponse.json({ success: false, error: String(spawnError) }, { headers: corsHeaders });
+    }
     
     child.unref(); // Cho phép process cha (Next.js) thoát/chạy độc lập mà không đợi Chrome đóng
 
