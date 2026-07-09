@@ -1,0 +1,420 @@
+// ==UserScript==
+// @name         FVIA Inboxes - Auto Fill & OTP Scraper
+// @namespace    http://tampermonkey.net/
+// @version      1.0
+// @description  Tu dong dien username mail KP moi vao fviainboxes.com, click Get Email, cho va cao OTP gui ve local bridge
+// @author       Antigravity AI
+// @match        https://fviainboxes.com/*
+// @match        https://fviadropinbox.com/*
+// @match        https://fviamail.work/*
+// @match        https://dropinboxes.com/*
+// @grant        GM_xmlhttpRequest
+// @connect      127.0.0.1
+// @connect      localhost
+// @connect      fviainboxes.com
+// @connect      fviadropinbox.com
+// @connect      fviamail.work
+// @connect      dropinboxes.com
+// @run-at       document-end
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // ===== BANG DEBUG TRANG THAI =====
+    const debugDiv = document.createElement('div');
+    debugDiv.style.cssText = 'position:fixed;bottom:10px;right:10px;background:#0f172a;color:white;padding:12px 16px;border-radius:8px;box-shadow:0 10px 15px -3px rgba(0,0,0,0.3);z-index:9999999;font-size:12px;font-family:monospace;max-width:400px;word-break:break-all;';
+    debugDiv.innerHTML = '[FVIA] Dang khoi dong...';
+    document.body.appendChild(debugDiv);
+
+    function setDebug(msg, color = '#0f172a') {
+        debugDiv.style.background = color;
+        debugDiv.innerHTML = '[FVIA]<br>' + msg;
+    }
+
+    // ===== TRANG THAI =====
+    let isProcessing = false;
+    let lastFilledUsername = '';
+    let hasClickedGetEmail = false;
+    let otpSent = false;
+
+    // ===== HELPER: GM_xmlhttpRequest wrapper =====
+    function makeRequest(url, method, data, callback) {
+        if (typeof GM_xmlhttpRequest !== 'undefined') {
+            // Thu port 3001 truoc, fallback sang 3000
+            if (url.includes('127.0.0.1:3000') || url.includes('localhost:3000')) {
+                const url3001 = url.replace(':3000', ':3001');
+                GM_xmlhttpRequest({
+                    method: method,
+                    url: url3001,
+                    headers: { "Content-Type": "application/json" },
+                    data: data ? JSON.stringify(data) : null,
+                    onload: function(res) {
+                        try {
+                            const json = JSON.parse(res.responseText);
+                            if (json && (json.success !== undefined || json.account !== undefined)) {
+                                callback(null, res.responseText);
+                                return;
+                            }
+                        } catch(e) {}
+                        fallback();
+                    },
+                    onerror: function() { fallback(); }
+                });
+                function fallback() {
+                    GM_xmlhttpRequest({
+                        method: method,
+                        url: url,
+                        headers: { "Content-Type": "application/json" },
+                        data: data ? JSON.stringify(data) : null,
+                        onload: function(res) { callback(null, res.responseText); },
+                        onerror: function(err) { callback(err, null); }
+                    });
+                }
+                return;
+            }
+            GM_xmlhttpRequest({
+                method: method,
+                url: url,
+                headers: { "Content-Type": "application/json" },
+                data: data ? JSON.stringify(data) : null,
+                onload: function(res) { callback(null, res.responseText); },
+                onerror: function(err) { callback(err, null); }
+            });
+        }
+    }
+
+    // ===== HELPER: Dien gia tri vao input tuong thich voi Vue/React =====
+    function safeFill(element, value) {
+        if (!element) return false;
+        try {
+            element.focus();
+            // Xoa noi dung cu
+            element.value = '';
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+
+            // Thu dung native setter (React)
+            const proto = Object.getPrototypeOf(element);
+            const desc = Object.getOwnPropertyDescriptor(proto, 'value');
+            if (desc && desc.set) {
+                desc.set.call(element, value);
+            } else {
+                element.value = value;
+            }
+
+            // Trigger tat ca event can thiet cho Vue va React
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+            element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'a' }));
+        } catch (e) {
+            element.value = value;
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        return true;
+    }
+
+    // ===== HELPER: Click an toan, tuong thich Vue/React =====
+    function safeClick(element) {
+        if (!element) return false;
+        try {
+            element.focus();
+            const rect = element.getBoundingClientRect();
+            const x = rect.left + rect.width / 2;
+            const y = rect.top + rect.height / 2;
+            const opts = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y, button: 0, buttons: 1 };
+            element.dispatchEvent(new PointerEvent('pointerdown', { ...opts, pointerId: 1, pointerType: 'mouse' }));
+            element.dispatchEvent(new MouseEvent('mousedown', opts));
+            setTimeout(() => {
+                element.dispatchEvent(new PointerEvent('pointerup', { ...opts, pointerId: 1, pointerType: 'mouse' }));
+                element.dispatchEvent(new MouseEvent('mouseup', opts));
+                element.dispatchEvent(new MouseEvent('click', opts));
+                if (typeof element.click === 'function') element.click();
+            }, 50);
+        } catch (e) {
+            try { element.click(); } catch(err) {}
+        }
+        return true;
+    }
+
+    // ===== HELPER: Trich xuat OTP 6 so tu HTML/text =====
+    function extractOtp(html, text) {
+        // Uu tien text truoc
+        if (text) {
+            const m = text.match(/\b\d{6}\b/g);
+            if (m) {
+                const otp = m.find(v => v !== '707070');
+                if (otp) return otp;
+            }
+        }
+        // Lam sach HTML roi tim
+        let cleaned = (html || '');
+        cleaned = cleaned.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+        cleaned = cleaned.replace(/style="[^"]*"/gi, '');
+        cleaned = cleaned.replace(/<[^>]+>/g, ' ');
+        const m2 = cleaned.match(/\b\d{6}\b/g);
+        if (m2) {
+            const otp = m2.find(v => v !== '707070');
+            return otp || null;
+        }
+        return null;
+    }
+
+    // ===== HELPER: Cao OTP truc tiep tu DOM (khi dang doc thu) =====
+    function scrapOtpFromDOM() {
+        let pageText = document.body.innerText || '';
+        // Thu doc ca iframe
+        try {
+            const iframes = document.querySelectorAll('iframe');
+            for (const iframe of iframes) {
+                try {
+                    if (iframe.contentDocument && iframe.contentDocument.body) {
+                        pageText += ' ' + (iframe.contentDocument.body.innerText || '');
+                    }
+                } catch(e) {}
+            }
+        } catch(e) {}
+
+        const matches = pageText.match(/\b\d{6,7}\b/g);
+        if (matches) {
+            const otp = matches.find(m => m !== '707070');
+            if (otp) {
+                const lower = pageText.toLowerCase();
+                const isMicrosoft = lower.includes('microsoft') || lower.includes('security code') ||
+                                    lower.includes('ma bao mat') || lower.includes('mã bảo mật') || lower.includes('capital');
+                if (isMicrosoft) return otp;
+            }
+        }
+        return null;
+    }
+
+    // ===== BUOC 1: DIEN USERNAME VA CLICK GET EMAIL =====
+    function fillUsernameAndSubmit(username, domain) {
+        if (isProcessing) return;
+
+        // Tim input username
+        const usernameInput = document.getElementById('username') ||
+                              document.querySelector('input[name="username"]') ||
+                              document.querySelector('input[type="text"]') ||
+                              document.querySelector('input[placeholder*="username" i]');
+
+        if (!usernameInput || usernameInput.offsetWidth === 0) {
+            setDebug('Khong tim thay o nhap username!', '#dc2626');
+            return;
+        }
+
+        const currentVal = (usernameInput.value || '').trim();
+
+        // Neu username chua dien hoac sai -> dien lai
+        if (currentVal !== username) {
+            setDebug(`Dien username: <b>${username}</b>`, '#0284c7');
+            safeFill(usernameInput, username);
+            lastFilledUsername = username;
+            hasClickedGetEmail = false;
+            return; // Cho vong lap tiep theo kiem tra lai
+        }
+
+        // Tim select domain
+        const selectEl = document.querySelector('select');
+        if (selectEl && selectEl.offsetWidth > 0) {
+            // Tim option co chua domain
+            const targetOption = Array.from(selectEl.options).find(opt => {
+                const val = (opt.value || '').toLowerCase();
+                const txt = (opt.text || '').toLowerCase();
+                return val.includes(domain) || txt.includes(domain);
+            });
+            if (targetOption && selectEl.value !== targetOption.value) {
+                setDebug(`Chon domain: <b>${domain}</b>`, '#0284c7');
+                selectEl.value = targetOption.value;
+                selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+                selectEl.dispatchEvent(new Event('input', { bubbles: true }));
+                hasClickedGetEmail = false;
+                return; // Cho vong lap tiep theo
+            }
+        }
+
+        // Da dien username & chon domain -> Click Get Email
+        if (!hasClickedGetEmail) {
+            const getEmailBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                const txt = (btn.textContent || '').trim().toLowerCase();
+                return txt.includes('get email') || txt.includes('check') || txt.includes('go');
+            }) || document.querySelector('button[type="submit"]');
+
+            if (getEmailBtn && getEmailBtn.offsetWidth > 0 && !getEmailBtn.disabled) {
+                setDebug(`Click <b>Get Email</b>...`, '#16a34a');
+                isProcessing = true;
+                safeClick(getEmailBtn);
+                hasClickedGetEmail = true;
+                setTimeout(() => { isProcessing = false; }, 3000);
+            }
+        }
+    }
+
+    // ===== BUOC 2: CHO VA CAO OTP TU DOM HOAC API =====
+    function waitAndScrapeOtp(email, username, domain, apiBase) {
+        // 1. Uu tien cao OTP truc tiep tu DOM
+        const domOtp = scrapOtpFromDOM();
+        if (domOtp && !otpSent) {
+            setDebug(`✅ Phat hien OTP tu man hinh: <b>${domOtp}</b>`, '#22c55e');
+            otpSent = true;
+            makeRequest(`${apiBase}/api/otp-bridge`, "POST", { email: email, otp: domOtp }, function() {});
+            return;
+        }
+
+        // 2. Thu goi API fviainboxes.com/messages de lay danh sach email
+        const sessionToken = getSessionToken();
+        if (sessionToken) {
+            const listUrl = `https://${window.location.host}/messages?username=${encodeURIComponent(username)}&domain=${encodeURIComponent(domain)}&_t=${Date.now()}`;
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: listUrl,
+                headers: {
+                    'Accept': 'application/json, text/plain, */*',
+                    'Authorization': `Bearer ${sessionToken}`
+                },
+                onload: function(res) {
+                    try {
+                        const data = JSON.parse(res.responseText);
+                        const messages = data.result || [];
+                        const msMsg = messages.find(msg => {
+                            const from = (msg.from || '').toLowerCase();
+                            const subj = (msg.subject || '').toLowerCase();
+                            return from.includes('microsoft') || subj.includes('microsoft') || subj.includes('security code') || subj.includes('mã bảo mật');
+                        });
+
+                        if (msMsg) {
+                            // Lay noi dung email
+                            const bodyUrl = `https://${window.location.host}/message?username=${encodeURIComponent(username)}&domain=${encodeURIComponent(domain)}&id=${encodeURIComponent(msMsg.id)}`;
+                            GM_xmlhttpRequest({
+                                method: 'GET',
+                                url: bodyUrl,
+                                headers: {
+                                    'Accept': 'application/json, text/plain, */*',
+                                    'Authorization': `Bearer ${sessionToken}`
+                                },
+                                onload: function(bodyRes) {
+                                    try {
+                                        const bodyText = bodyRes.responseText;
+                                        // Thu parse JSON de lay html/text
+                                        let html = bodyText, text = '';
+                                        try {
+                                            const bodyJson = JSON.parse(bodyText);
+                                            html = bodyJson.html || bodyJson.data || bodyText;
+                                            text = bodyJson.text || '';
+                                        } catch(e) {}
+                                        const otp = extractOtp(html, text);
+                                        if (otp && !otpSent) {
+                                            setDebug(`✅ OTP tu API FVIA: <b>${otp}</b>`, '#22c55e');
+                                            otpSent = true;
+                                            makeRequest(`${apiBase}/api/otp-bridge`, "POST", { email: email, otp: otp }, function() {});
+                                        }
+                                    } catch(e) {}
+                                },
+                                onerror: function() {}
+                            });
+                        } else {
+                            setDebug(`⏳ Dang doi email Microsoft gui ve...<br>📧 ${email}`, '#eab308');
+                        }
+                    } catch(e) {
+                        setDebug(`⏳ Dang doi email Microsoft...<br>📧 ${email}`, '#eab308');
+                    }
+                },
+                onerror: function() {
+                    setDebug(`⏳ Khong ket noi duoc API FVIA, doi DOM...`, '#eab308');
+                }
+            });
+        } else {
+            setDebug(`⏳ Cho email Microsoft gui ve...<br>📧 ${email}`, '#eab308');
+        }
+    }
+
+    // ===== HELPER: Lay session token tu sessionStorage (fviainboxes dung Vue + session token) =====
+    function getSessionToken() {
+        try {
+            return sessionStorage.getItem('sessionToken') || '';
+        } catch(e) {
+            return '';
+        }
+    }
+
+    // ===== KIEM TRA DA VAO INBOX CHUA =====
+    function isInboxActive() {
+        const pageText = (document.body.innerText || '').toLowerCase();
+        // Kiem tra co phan Inbox hoac No emails yet
+        const hasInbox = pageText.includes('inbox') || pageText.includes('no emails yet');
+        // Kiem tra URL co chua thong tin da submit
+        const hasEmailList = document.querySelector('li, tr, [role="row"]') !== null;
+        // Kiem tra co text "emails will appear here"
+        const hasAppear = pageText.includes('emails will appear here');
+        return hasInbox && (hasEmailList || hasAppear);
+    }
+
+    // ===== VONG LAP CHINH =====
+    setDebug('Dang ket noi Tool...', '#6366f1');
+
+    setInterval(() => {
+        if (otpSent) return;
+
+        function processAccount(resData, apiBase) {
+            try {
+                const account = resData?.account;
+                // Uu tien newRecovery (mail KP moi), fallback sang recovery
+                const recoveryEmail = account?.newRecovery || account?.recovery;
+
+                if (!resData.success || !account || !recoveryEmail) {
+                    setDebug('Cho thong tin email KP moi tu Tool...', '#eab308');
+                    return;
+                }
+
+                const email = recoveryEmail.toLowerCase().trim();
+                const parts = email.split('@');
+                const username = parts[0];
+                const domain = parts[1];
+
+                if (!username || !domain) {
+                    setDebug('Email KP moi khong hop le!', '#dc2626');
+                    return;
+                }
+
+                // Kiem tra trang thai trang
+                if (isInboxActive() && hasClickedGetEmail) {
+                    waitAndScrapeOtp(email, username, domain, apiBase);
+                } else {
+                    fillUsernameAndSubmit(username, domain);
+                }
+
+            } catch(e) {
+                setDebug('Loi xu ly du lieu!', '#dc2626');
+            }
+        }
+
+        // Thu port 3001 truoc
+        makeRequest('http://127.0.0.1:3001/api/current-account', "GET", null, function(err, responseText) {
+            let handled = false;
+            if (!err) {
+                try {
+                    const resData = JSON.parse(responseText);
+                    if (resData.success && resData.account && (resData.account.newRecovery || resData.account.recovery)) {
+                        handled = true;
+                        processAccount(resData, 'http://127.0.0.1:3001');
+                        return;
+                    }
+                } catch(e) {}
+            }
+
+            // Fallback sang port 3000
+            if (!handled) {
+                makeRequest('http://127.0.0.1:3000/api/current-account', "GET", null, function(err2, resText2) {
+                    if (!err2) {
+                        try {
+                            const resData2 = JSON.parse(resText2);
+                            processAccount(resData2, 'http://127.0.0.1:3000');
+                        } catch(e) {}
+                    } else {
+                        setDebug('Khong ket noi duoc Tool!', '#dc2626');
+                    }
+                });
+            }
+        });
+    }, 2500);
+})();
+

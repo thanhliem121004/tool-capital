@@ -40,13 +40,7 @@ export async function POST(request: NextRequest) {
     const profilePath = path.join(process.cwd(), '.chrome-profile');
     
     // Sử dụng spawn để truyền các đối số (args) dưới dạng mảng
-    // Thêm --user-data-dir chỉ định một cấu hình profile riêng biệt nằm trong thư mục dự án
-    // để tránh xung đột ProcessSingleton Lock File khi người dùng đang chạy Chrome thường
-    const args = [
-      '--incognito',
-      '--new-window',
-      `--user-data-dir=${profilePath}`
-    ];
+    const args = ['--incognito', '--new-window'];
     if (profile) {
       args.push(`--profile-directory=${profile}`);
     }

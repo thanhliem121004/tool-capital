@@ -1,26 +1,19 @@
 // ==UserScript==
-// @name         Inboxes, Fvia & SMVmail OTP Auto Scraper & Bridge
+// @name         Inboxes & SMVmail OTP Auto Scraper & Bridge
 // @namespace    http://tampermonkey.net/
-// @version      1.2
-// @description  Tu dong Add Inbox tren inboxes.com, fviainboxes.com va cao OTP gui ve local bridge
+// @version      1.3
+// @description  Tu dong Add Inbox tren inboxes.com va cao OTP gui ve local bridge (FVIA da tach sang SCRIPT_10)
 // @author       Antigravity AI
 // @match        https://inboxes.com/*
 // @match        https://smvmail.com/email/*
-// @match        https://fviainboxes.com/*
-// @match        https://fviadropinbox.com/*
-// @match        https://fviamail.work/*
-// @match        https://dropinboxes.com/*
 // @grant        GM_xmlhttpRequest
 // @connect      127.0.0.1
 // @connect      localhost
 // @connect      inboxes.com
 // @connect      smvmail.com
-// @connect      fviainboxes.com
-// @connect      fviadropinbox.com
-// @connect      fviamail.work
-// @connect      dropinboxes.com
 // @run-at       document-end
 // ==/UserScript==
+
 
 (function() {
     'use strict';
