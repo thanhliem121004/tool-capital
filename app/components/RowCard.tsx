@@ -197,10 +197,10 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
   const [checkCapitalResult, setCheckCapitalResult] = useState<'idle' | 'checking' | 'ok' | 'error' | 'cf_block'>('idle');
   const [checkCapitalError, setCheckCapitalError] = useState('');
 
-  async function ensureUSInfoPopulated() {
-    let currentFirst = row.firstName;
-    let currentLast = row.lastName;
-    let currentZip = row.zipCode;
+  async function ensureUSInfoPopulatedFor(r: SheetRow) {
+    let currentFirst = r.firstName;
+    let currentLast = r.lastName;
+    let currentZip = r.zipCode;
 
     if (!currentFirst || !currentLast || !currentZip) {
       const name = getRandomUSName(allRows);
@@ -215,14 +215,14 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             sheetId,
-            rowIndex: row.rowIndex,
+            rowIndex: r.rowIndex,
             firstName: currentFirst,
             lastName: currentLast,
             zipCode: currentZip
           })
         });
         if (res.ok) {
-          onUpdated(row.rowIndex, {
+          onUpdated(r.rowIndex, {
             firstName: currentFirst,
             lastName: currentLast,
             zipCode: currentZip
@@ -237,6 +237,51 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
       lastName: currentLast,
       zipCode: currentZip
     };
+  }
+
+  async function ensureUSInfoPopulated() {
+    return ensureUSInfoPopulatedFor(row);
+  }
+
+  async function handleOpenMailRealMachineFor(r: SheetRow) {
+    const info = await ensureUSInfoPopulatedFor(r);
+    const accData = {
+      sheetId,
+      sheetName,
+      rowIndex: r.rowIndex,
+      email: r.email,
+      pass: r.password,
+      code: r.code,
+      recovery: r.recovery,
+      oldRecovery: r.oldRecovery,
+      firstName: info.firstName,
+      lastName: info.lastName,
+      zipCode: info.zipCode,
+      isAutoReg: true
+    };
+    
+    // Lưu lên active-reg-data của máy chủ và chờ hoàn tất
+    try {
+      await fetch('/api/active-reg-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(accData)
+      });
+    } catch (err) {
+      console.error('Lỗi lưu active reg:', err);
+    }
+
+    const base64Data = btoa(unescape(encodeURIComponent(JSON.stringify(accData))));
+    const oauthUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=9199bf20-a13f-4107-85dc-02114787ef48&scope=https%3A%2F%2Foutlook.office.com%2F.default%20openid%20profile%20offline_access&redirect_uri=https%3A%2F%2Foutlook.live.com%2Fmail%2F&client-request-id=ccdd58c9-ae4b-3c55-0ffa-c890dfa17330&response_mode=fragment&client_info=1&clidata=1&prompt=select_account&nonce=019f4231-f4ad-74cb-8f28-7ffa09210948&state=eyJpZCI6IjAxOWY0MjMxLWY0YWQtNzY1YS1hYjViLThiMDJiNGY1ZDAwZCIsIm1ldGEiOnsiaW50ZXJhY3Rpb25UeXBlIjoicmVkaXJlY3QifX0%3D%7CaHR0cHM6Ly9vdXRsb29rLmxpdmUuY29tL21haWwv&claims=%7B%22access_token%22%3A%7B%22xms_cc%22%3A%7B%22values%22%3A%5B%22CP1%22%5D%7D%7D%7D&x-client-SKU=msal.js.browser&x-client-VER=5.12.0&response_type=code&code_challenge=ODz59kCxQQ4SOagHJIdLUBvPIKLbvUc-t70OHFFwS-w&code_challenge_method=S256&cobrandid=ab0455a0-8d03-46b9-b18b-df2f57b9e44c&fl=dob%2Cflname%2Cwld#capitalReg=${base64Data}`;
+    
+    fetch('/api/open-incognito', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: oauthUrl })
+    }).catch(err => {
+      console.error('Lỗi gọi open-incognito:', err);
+      window.open(oauthUrl, '_blank');
+    });
   }
 
   useEffect(() => {
@@ -1189,6 +1234,22 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                         mkCapital: expectedPass 
                       });
                       alert(`Đã lưu mật khẩu ${expectedPass} và ngày hôm nay vào Sheet!`);
+
+                      // Tự động copy email và mở mail của hàng tiếp theo chưa làm của cùng một người
+                      const nextRow = allRows.find(r => 
+                        r.rowIndex > row.rowIndex && 
+                        !r.isDone && 
+                        !r.isPasswordError &&
+                        (!row.name || r.name === row.name)
+                      );
+                      if (nextRow) {
+                        try {
+                          await navigator.clipboard.writeText(nextRow.email);
+                        } catch (clipErr) {
+                          console.error('Lỗi copy email hàng tiếp theo:', clipErr);
+                        }
+                        handleOpenMailRealMachineFor(nextRow);
+                      }
                     } catch (e: any) {
                       alert('Lỗi khi lưu: ' + (e.message || String(e)));
                     } finally {
@@ -1196,7 +1257,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
                     }
                   }}
                   disabled={loadingMarkError}
-                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded shadow-sm text-[11px] flex items-center gap-1 transition-colors flex-shrink-0"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-lg shadow text-xs flex items-center gap-1 transition-all flex-shrink-0"
                 >
                   💾 Lưu
                 </button>
@@ -1321,46 +1382,7 @@ export function RowCard({ row, index, sheetId, sheetName, onUpdated, fviaToken, 
               
               <div className="flex gap-2">
                 <button
-                  onClick={async () => {
-                    const info = await ensureUSInfoPopulated();
-                    const accData = {
-                      sheetId,
-                      sheetName,
-                      rowIndex: row.rowIndex,
-                      email: row.email,
-                      pass: row.password,
-                      code: row.code,
-                      recovery: row.recovery,
-                      oldRecovery: row.oldRecovery,
-                      firstName: info.firstName,
-                      lastName: info.lastName,
-                      zipCode: info.zipCode,
-                      isAutoReg: true
-                    };
-                    
-                    // Lưu lên active-reg-data của máy chủ và chờ hoàn tất
-                    try {
-                      await fetch('/api/active-reg-data', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(accData)
-                      });
-                    } catch (err) {
-                      console.error('Lỗi lưu active reg:', err);
-                    }
-
-                    const base64Data = btoa(unescape(encodeURIComponent(JSON.stringify(accData))));
-                    const oauthUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=9199bf20-a13f-4107-85dc-02114787ef48&scope=https%3A%2F%2Foutlook.office.com%2F.default%20openid%20profile%20offline_access&redirect_uri=https%3A%2F%2Foutlook.live.com%2Fmail%2F&client-request-id=ccdd58c9-ae4b-3c55-0ffa-c890dfa17330&response_mode=fragment&client_info=1&clidata=1&prompt=select_account&nonce=019f4231-f4ad-74cb-8f28-7ffa09210948&state=eyJpZCI6IjAxOWY0MjMxLWY0YWQtNzY1YS1hYjViLThiMDJiNGY1ZDAwZCIsIm1ldGEiOnsiaW50ZXJhY3Rpb25UeXBlIjoicmVkaXJlY3QifX0%3D%7CaHR0cHM6Ly9vdXRsb29rLmxpdmUuY29tL21haWwv&claims=%7B%22access_token%22%3A%7B%22xms_cc%22%3A%7B%22values%22%3A%5B%22CP1%22%5D%7D%7D%7D&x-client-SKU=msal.js.browser&x-client-VER=5.12.0&response_type=code&code_challenge=ODz59kCxQQ4SOagHJIdLUBvPIKLbvUc-t70OHFFwS-w&code_challenge_method=S256&cobrandid=ab0455a0-8d03-46b9-b18b-df2f57b9e44c&fl=dob%2Cflname%2Cwld#capitalReg=${base64Data}`;
-                    
-                    fetch('/api/open-incognito', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ url: oauthUrl })
-                    }).catch(err => {
-                      console.error('Lỗi gọi open-incognito:', err);
-                      window.open(oauthUrl, '_blank');
-                    });
-                  }}
+                  onClick={() => handleOpenMailRealMachineFor(row)}
                   type="button"
                   className="flex-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-[11px] transition-colors"
                   title="Mở link đăng nhập Hotmail trên Chrome thường của máy chính"
